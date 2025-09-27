@@ -72,11 +72,14 @@ minify_file() {
     # Calculate original size
     local original_size=$(stat -f%z "$input_file" 2>/dev/null || stat -c%s "$input_file" 2>/dev/null || echo "0")
 
-    # Minify the file (remove comments and docstrings, keep formatting readable)
+    # Minify the file (remove comments and docstrings only - safest for f-strings)
+    # Using minimal options to prevent f-string syntax errors with nested quotes
     python3 -m python_minifier \
         --remove-literal-statements \
         --no-combine-imports \
         --no-remove-annotations \
+        --no-hoist-literals \
+        --no-rename-locals \
         --output "$temp_file" \
         "$input_file"
 

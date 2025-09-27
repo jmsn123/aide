@@ -12,12 +12,14 @@ interface TransactionItem {
   "Date": string
   "Transaction_ID": string
   "Remarks": string
-  "Amount": string
+  "Amount"?: string
   "Balance": string
-  "Amount_Numeric": number
-  "Balance_Numeric": number
-  "Transaction_Type": string
+  "Amount_Numeric"?: number
+  "Balance_Numeric"?: number
+  "Transaction_Type"?: string
   "Page_Number": number
+  "Debit"?: string
+  "Credit"?: string
   // Formatted fields from backend
   formatted_txn_date?: string
   formatted_value_date?: string
@@ -105,8 +107,10 @@ export function ResultsPage() {
         // Calculate total pages and set initial filtered transactions
         if (response.data.transactions && response.data.transactions.length > 0) {
           const pages = Math.max(...response.data.transactions.map((t: TransactionItem) => t.Page_Number))
+          const firstPage = Math.min(...response.data.transactions.map((t: TransactionItem) => t.Page_Number))
           setTotalPages(pages)
-          setFilteredTransactions(response.data.transactions.filter((t: TransactionItem) => t.Page_Number === 1))
+          setCurrentPage(firstPage)
+          setFilteredTransactions(response.data.transactions.filter((t: TransactionItem) => t.Page_Number === firstPage))
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch statement data')
@@ -118,16 +122,26 @@ export function ResultsPage() {
     fetchStatementData()
   }, [id])
 
-  // Filter transactions when page changes
+  // Filter transactions when page changes manually
   useEffect(() => {
     if (statementData?.transactions) {
       const pageTransactions = statementData.transactions.filter((t: TransactionItem) => t.Page_Number === currentPage)
       setFilteredTransactions(pageTransactions)
     }
-  }, [currentPage, statementData])
+  }, [currentPage])
 
   const handlePageChange = (page: number) => {
-    setCurrentPage(page)
+    // Only update if we have transaction data and the page actually has transactions
+    if (statementData?.transactions) {
+      const availablePages = [...new Set(statementData.transactions.map(t => t.Page_Number))]
+      if (availablePages.includes(page)) {
+        setCurrentPage(page)
+      }
+      // Ignore page changes to pages without transactions (e.g., PDFViewer trying to set page 1)
+    } else {
+      // If no transaction data yet, allow the change
+      setCurrentPage(page)
+    }
   }
 
   const handlePDFViewerCollapseChange = (isCollapsed: boolean) => {
@@ -154,9 +168,19 @@ export function ResultsPage() {
     if (!statementData?.transactions) return null
 
     const pageTransactions = filteredTransactions
-    const totalAmount = pageTransactions.reduce((sum, t) => sum + t.Amount_Numeric, 0)
-    const creditCount = pageTransactions.filter(t => t.Transaction_Type === 'Credit').length
-    const debitCount = pageTransactions.filter(t => t.Transaction_Type === 'Debit').length
+    const totalAmount = pageTransactions.reduce((sum, t) => sum + (t.Amount_Numeric || 0), 0)
+
+    // Handle both formats: Transaction_Type field or separate Debit/Credit fields
+    let creditCount = 0
+    let debitCount = 0
+
+    pageTransactions.forEach(t => {
+      if (t.Transaction_Type === 'Credit' || t.Credit) {
+        creditCount++
+      } else if (t.Transaction_Type === 'Debit' || t.Debit) {
+        debitCount++
+      }
+    })
 
     return {
       count: pageTransactions.length,
@@ -412,10 +436,10 @@ export function ResultsPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-sm font-mono text-right text-red-600 font-medium">
-                            {transaction.debit_amount || ''}
+                            {transaction.debit_amount || transaction.Debit || ''}
                           </TableCell>
                           <TableCell className="text-sm font-mono text-right text-green-600 font-medium">
-                            {transaction.credit_amount || ''}
+                            {transaction.credit_amount || transaction.Credit || ''}
                           </TableCell>
                           <TableCell className="text-sm font-mono text-right font-medium">
                             {transaction.formatted_balance || transaction.Balance?.replace(/\s*\(?\s*(DR|dr|Dr|CR|cr|Cr)\s*\)?\s*/g, '').trim() || ''}

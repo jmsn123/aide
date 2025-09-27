@@ -209,12 +209,14 @@ build_business_layer() {
     cp "$API_ROOT/config.py" "$python_dir/"
     cp "$API_ROOT/logging_config.py" "$python_dir/"
     cp "$API_ROOT/extract_pdf_data.py" "$python_dir/"
+    cp "$API_ROOT/bank_config.py" "$python_dir/"
 
     # Minify business logic files for production
     log_info "Minifying business logic files for production deployment..."
     "$SCRIPT_DIR/minify-python.sh" "$python_dir/config.py"
     "$SCRIPT_DIR/minify-python.sh" "$python_dir/logging_config.py"
-    "$SCRIPT_DIR/minify-python.sh" "$python_dir/extract_pdf_data.py"
+    # Skip minification for files with complex f-string usage until better solution
+    log_info "  Skipping minification for extract_pdf_data.py and bank_config.py (f-string quote handling)"
 
     # Copy formatters directory if it exists
     if [[ -d "$API_ROOT/formatters" ]]; then
@@ -230,6 +232,12 @@ build_business_layer() {
         # Minify Python files in extractors for production
         log_info "Minifying extractor files for production deployment..."
         "$SCRIPT_DIR/minify-python.sh" "$python_dir/extractors"
+    fi
+
+    # Copy validators directory if it exists
+    if [[ -d "$API_ROOT/validators" ]]; then
+        log_info "Copying validators directory..."
+        cp -r "$API_ROOT/validators" "$python_dir/"
     fi
 
 

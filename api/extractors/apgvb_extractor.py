@@ -410,7 +410,7 @@ class APGVBExtractor(BaseBankExtractor):
         """
         try:
             # Import here to avoid circular imports
-            from ..bank_config import BankConfigService
+            from bank_config import BankConfigService
 
             # Get bank configuration for APGVB
             config_service = BankConfigService()
