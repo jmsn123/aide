@@ -188,20 +188,26 @@ def validate_bank_configuration(bank_id):
 
     try:
         table = dynamodb.Table(BANK_CONFIGURATIONS_TABLE)
-        response = table.get_item(
-            Key={
-                'PK': 'BANK_CONFIG',
-                'SK': bank_id
+
+        # Query using PK and filter by BankCode since SK structure is complex
+        response = table.query(
+            KeyConditionExpression='PK = :pk',
+            FilterExpression='BankCode = :bank_id AND #status = :status',
+            ExpressionAttributeNames={
+                '#status': 'Status'
+            },
+            ExpressionAttributeValues={
+                ':pk': 'BANK_CONFIG',
+                ':bank_id': bank_id,
+                ':status': 'ACTIVE'
             }
         )
 
-        item = response.get('Item')
-        if not item:
+        items = response.get('Items', [])
+        if not items:
             return False, "Invalid bank selected. Please select from the list."
 
-        if item.get('Status') != 'ACTIVE':
-            return False, "Selected bank is currently unavailable."
-
+        item = items[0]  # Should only be one matching item
         return True, item.get('BankName')
     except Exception as e:
         logger.error(f"Bank validation error: {e}")

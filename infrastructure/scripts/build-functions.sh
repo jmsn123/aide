@@ -87,8 +87,8 @@ build_function() {
             cp "$API_ROOT/extract_pdf_data.py" "$build_dir/"
             log_info "  Copied extract_pdf_data.py"
 
-            # Minify the main extraction file
-            "$SCRIPT_DIR/minify-python.sh" "$build_dir/extract_pdf_data.py"
+            # Skip minification for extract_pdf_data.py due to f-string quote handling issues
+            log_info "  Skipping minification for extract_pdf_data.py (f-string quote handling)"
         fi
     fi
 
