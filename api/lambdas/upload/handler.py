@@ -189,15 +189,15 @@ def validate_bank_configuration(bank_id):
     try:
         table = dynamodb.Table(BANK_CONFIGURATIONS_TABLE)
 
-        # Query using PK and filter by BankCode since SK structure is complex
+        # Query using GSI for efficient BankCode lookup
         response = table.query(
-            KeyConditionExpression='PK = :pk',
-            FilterExpression='BankCode = :bank_id AND #status = :status',
+            IndexName='BankCode-Index',
+            KeyConditionExpression='BankCode = :bank_id',
+            FilterExpression='#status = :status',
             ExpressionAttributeNames={
                 '#status': 'Status'
             },
             ExpressionAttributeValues={
-                ':pk': 'BANK_CONFIG',
                 ':bank_id': bank_id,
                 ':status': 'ACTIVE'
             }

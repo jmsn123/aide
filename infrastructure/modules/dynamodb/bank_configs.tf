@@ -18,6 +18,19 @@ resource "aws_dynamodb_table" "bank_configurations" {
     type = "S"
   }
 
+  # BankCode attribute for GSI
+  attribute {
+    name = "BankCode"
+    type = "S"
+  }
+
+  # GSI for efficient queries by BankCode
+  global_secondary_index {
+    name               = "BankCode-Index"
+    hash_key           = "BankCode"
+    projection_type    = "ALL"
+  }
+
   # Enable point-in-time recovery for data protection
   point_in_time_recovery {
     enabled = true
