@@ -409,8 +409,16 @@ class APGVBExtractor(BaseBankExtractor):
                 or None if not available or if BankConfigService fails
         """
         try:
-            # Import here to avoid circular imports
-            from bank_config import BankConfigService
+            # Import here to avoid circular imports with fallback pattern
+            try:
+                from bank_config import BankConfigService
+            except ImportError:
+                # Fallback to relative import if absolute import fails
+                try:
+                    from ..bank_config import BankConfigService
+                except ImportError:
+                    # If both imports fail, return None to use default identifiers
+                    return None
 
             # Get bank configuration for APGVB
             config_service = BankConfigService()
