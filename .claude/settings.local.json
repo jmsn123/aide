@@ -105,7 +105,8 @@
       "Bash(git push:*)",
       "Bash(/Users/ramanjaneyulumedikonda/dev/aide/infrastructure/scripts/minify-python.sh:*)",
       "Bash(git restore:*)",
-      "Bash(open http://localhost:5174)"
+      "Bash(git fetch:*)",
+      "Bash(git merge:*)"
     ],
     "deny": [],
     "ask": []
