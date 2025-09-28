@@ -224,7 +224,7 @@ function App() {
       />
 
       <div className="flex-1">
-        <div className="w-full max-w-none 2xl:max-w-7xl 2xl:mx-auto py-6">
+        <div className="w-full px-2 py-6">
           {/* Page Header */}
           <div className="mb-8 flex justify-between items-start">
             <div>
@@ -278,13 +278,13 @@ function App() {
                   </TableHead>
                   <TableHead className="w-[10%]">File Size</TableHead>
                   <TableHead className="w-[12%]">Status</TableHead>
-                  <TableHead className="w-[22%]">
+                  <TableHead className="w-[16%]">
                     <div className="flex items-center gap-2">
                       <AlertCircle className="w-4 h-4" />
                       Details
                     </div>
                   </TableHead>
-                  <TableHead className="w-[10%]">
+                  <TableHead className="w-[16%]">
                     <div className="flex items-center gap-2">
                       <Building className="w-4 h-4" />
                       Bank
