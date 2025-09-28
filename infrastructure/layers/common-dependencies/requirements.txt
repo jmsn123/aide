@@ -6,6 +6,13 @@
 # PDF processing - using pypdf for consistency
 pypdf==5.1.0
 
+# Cryptography for encrypted PDF support (required by pypdf for AES encryption)
+# CRITICAL: These dependencies are MANDATORY and MUST be built for Lambda platform
+# CFFI is required by cryptography backend - build process will FAIL if missing
+# NO FALLBACKS: If platform-specific build fails, entire layer build fails
+cffi>=1.15.0            # Required backend for cryptography in Lambda
+cryptography>=3.1       # AES encryption support for password-protected PDFs
+
 # File type detection
 python-magic==0.4.27
 

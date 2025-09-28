@@ -8,6 +8,7 @@ from .union_bank_extractor import UnionBankExtractor, extract_union_bank_stateme
 from .canara_bank_extractor import CanaraBankExtractor, extract_canara_bank_statement
 from .apgvb_extractor import APGVBExtractor, extract_apgvb_statement
 from .axis_bank_extractor import AxisBankExtractor, extract_axis_bank_statement
+from .boi_extractor import BOIExtractor, extract_boi_statement
 
 __all__ = [
     'BaseBankExtractor',
@@ -19,5 +20,7 @@ __all__ = [
     'APGVBExtractor',
     'extract_apgvb_statement',
     'AxisBankExtractor',
-    'extract_axis_bank_statement'
+    'extract_axis_bank_statement',
+    'BOIExtractor',
+    'extract_boi_statement'
 ]

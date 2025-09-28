@@ -189,7 +189,7 @@ def validate_bank_configuration(bank_id):
     try:
         table = dynamodb.Table(BANK_CONFIGURATIONS_TABLE)
 
-        # Query using GSI for efficient BankCode lookup
+        # Use GSI for efficient BankCode lookup
         response = table.query(
             IndexName='BankCode-Index',
             KeyConditionExpression='BankCode = :bank_id',
