@@ -16,22 +16,17 @@ Version: 1.0.0 (Optimized for Actual Format)
 import re
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple, Union
-from pathlib import Path
-from decimal import Decimal, InvalidOperation
+from typing import Dict, List, Optional, Tuple
+from decimal import InvalidOperation
 
 # PDF processing library
 try:
     import pdfplumber
-    PDFPLUMBER_AVAILABLE = True
 except ImportError:
     raise ImportError("pdfplumber is required for Axis Bank PDF extraction. Install with: pip install pdfplumber")
 
-try:
-    import pandas as pd
-    PANDAS_AVAILABLE = True
-except ImportError:
-    PANDAS_AVAILABLE = False
+# Note: pandas was removed from dependencies as it's not currently used
+# If advanced data processing is needed in the future, pandas can be re-added
 
 from .base_extractor import BaseBankExtractor
 
@@ -49,7 +44,6 @@ class AxisBankExtractor(BaseBankExtractor):
     """
 
     # Compiled regex patterns for metadata only (not transactions)
-    CUSTOMER_PATTERN = re.compile(r'^([A-Z\s]+)\n', re.MULTILINE)
     ACCOUNT_PATTERN = re.compile(r'Account No\s*:\s*(\d+)')
     PERIOD_PATTERN = re.compile(r'From\s*:\s*(\d{2}-\d{2}-\d{4})\s*To\s*:\s*(\d{2}-\d{2}-\d{4})')
     IFSC_PATTERN = re.compile(r'IFSC Code\s*:\s*([A-Z0-9]+)')
@@ -80,7 +74,6 @@ class AxisBankExtractor(BaseBankExtractor):
             "upi_transactions"
         ]
         super().__init__()
-        self.supported_formats = ["PDF"]
         self.transactions = []
         self.statement_metadata = {}
 
@@ -223,9 +216,7 @@ class AxisBankExtractor(BaseBankExtractor):
                 except (ValueError, InvalidOperation):
                     metadata["closing_balance"] = 0.0
 
-            # Set defaults
-            if "account_type" not in metadata:
-                metadata["account_type"] = "SAVINGS ACCOUNT"
+            # Account type is already set in default metadata
 
             logger.info(f"Extracted Axis Bank metadata for account: {metadata.get('account_number', 'Unknown')}")
 
