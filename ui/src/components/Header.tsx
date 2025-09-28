@@ -16,7 +16,7 @@ export function Header({
   onReset 
 }: HeaderProps) {
   return (
-    <header className="h-[60px] bg-background border-b border-border/50 flex items-center justify-between px-6 panel-shadow">
+    <header className="h-[60px] bg-background border-b border-border/50 flex items-center justify-between px-2 panel-shadow">
       {/* Brand Section */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">
@@ -28,7 +28,7 @@ export function Header({
               Bank Statement OCR Processor
             </h1>
             <p className="text-xs text-muted-foreground">
-              Supported Banks: Union Bank
+              5+ Banks Supported • Intelligent Document Processing
             </p>
           </div>
         </div>

@@ -223,8 +223,8 @@ function App() {
         onReset={handleReset}
       />
 
-      <div className="flex-1 p-6">
-        <div className="max-w-7xl mx-auto">
+      <div className="flex-1">
+        <div className="w-full px-2 py-6">
           {/* Page Header */}
           <div className="mb-8 flex justify-between items-start">
             <div>
@@ -260,36 +260,37 @@ function App() {
 
           {/* Statements Table */}
           <div className="bg-card border border-border rounded-lg overflow-hidden">
-            <Table>
+            <div className="min-w-full">
+              <Table className="w-full" style={{tableLayout: 'fixed'}}>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[250px]">
+                  <TableHead className="w-[18%]">
                     <div className="flex items-center gap-2">
                       <FileText className="w-4 h-4" />
                       Document Name
                     </div>
                   </TableHead>
-                  <TableHead>
+                  <TableHead className="w-[15%]">
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4" />
                       Upload Time
                     </div>
                   </TableHead>
-                  <TableHead>File Size</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>
+                  <TableHead className="w-[10%]">File Size</TableHead>
+                  <TableHead className="w-[12%]">Status</TableHead>
+                  <TableHead className="w-[16%]">
                     <div className="flex items-center gap-2">
                       <AlertCircle className="w-4 h-4" />
                       Details
                     </div>
                   </TableHead>
-                  <TableHead>
+                  <TableHead className="w-[16%]">
                     <div className="flex items-center gap-2">
                       <Building className="w-4 h-4" />
                       Bank
                     </div>
                   </TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="w-[20%]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -345,7 +346,7 @@ function App() {
                       </TableCell>
                       <TableCell>
                         {statement.status === 'completed' ? (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1 flex-wrap">
                             <Button
                               variant="outline"
                               size="sm"
@@ -379,7 +380,8 @@ function App() {
                   ))
                 )}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           </div>
         </div>
       </div>
