@@ -7,6 +7,7 @@ from .base_extractor import BaseBankExtractor, SecurityError
 from .union_bank_extractor import UnionBankExtractor, extract_union_bank_statement
 from .canara_bank_extractor import CanaraBankExtractor, extract_canara_bank_statement
 from .apgvb_extractor import APGVBExtractor, extract_apgvb_statement
+from .axis_bank_extractor import AxisBankExtractor, extract_axis_bank_statement
 
 __all__ = [
     'BaseBankExtractor',
@@ -16,5 +17,7 @@ __all__ = [
     'CanaraBankExtractor',
     'extract_canara_bank_statement',
     'APGVBExtractor',
-    'extract_apgvb_statement'
+    'extract_apgvb_statement',
+    'AxisBankExtractor',
+    'extract_axis_bank_statement'
 ]

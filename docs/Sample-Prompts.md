@@ -1,31 +1,36 @@
-I need to add support for ANDHRA PRADESH GRAMEENA BANK PDF statements to my extraction system. The PDFs have a different format with transaction tables and I need to extract account details, transactions, and calculate financial summaries.
--------
-I need to add support for ANDHRA PRADESH GRAMEENA BANK PDF statements. Please use Task(subagent_type="bank-statement-extractor") agent with hooks to:
-
-  1. Analyze the PDF format from the sample at /Users/ramanjaneyulumedikonda/Downloads/bank statements samples/apgvb only pdf/APGVB.pdf
-  2. Create a complete extractor following BaseBankExtractor interface
-  3. Validate output structure and financial accuracy
-  4. Update the bank configuration system
-  5. Run comprehensive tests
-
-Please run the bank-statement-extractor and general-purpose agents in parallel for  efficiency.
+Prompts:
 --------
-  Use the bank-statement-extractor agent to implement support for [BANK_NAME] PDF 
-  statements. Please analyze the format and create a complete extractor following the 
-  established patterns.
+I need to add support for Axis Bank PDF statements to our serverless PDF extraction system. Please use the bank-extractor-specialist agent to:
 
---------
-  "Use the bank-statement-extractor agent to implement support for [BANK_NAME] PDF 
-  statements. I have a sample PDF at [PATH]. Please analyze the format and create a 
-  complete extractor following the established patterns."
+  1. Analyze the sample PDF at
+  '/Users/ramanjaneyulumedikonda/Downloads/axis original pdf.pdf' to understand:
+    - Document structure and layout patterns
+    - Transaction table format and columns
+    - Date formats used
+    - Balance information placement
+    - Any multi-line transaction scenarios
+  1. Create a complete Axis Bank extractor following our established patterns by:
+    - Implementing axis_bank_extractor.py in
+  the appropriate directory
+    - Following the same class structure and
+  methods as existing extractors
+    - Handling edge cases like multi-line
+  transactions, different date formats, and
+  balance calculations
+    - Including proper error handling and
+  validation
+  1. Ensure integration with the existing
+  system:
+    - Register the new extractor in the bank
+  registry
+    - Follow naming conventions used by other
+  bank extractors
+    - Include appropriate logging and debugging
+   information
 
-  For Multiple Agents in Parallel:
-
-  "Please run agents in parallel to:
-  1. Use bank-statement-extractor agent to create the extractor implementation
-  2. Use general-purpose agent to update the database configuration
+  Please analyze the PDF format thoroughly
+  before implementation and create a robust
+  extractor that handles the specific
+  formatting patterns used by Axis Bank
+  statements.
 -----------
-
-NOtes: You're absolutely right! I can see there are still string matching patterns that aren't
-  sustainable. Let me implement a completely different approach that doesn't rely on
-  transaction description patterns at all.
