@@ -72,29 +72,38 @@ minify_file() {
     # Calculate original size
     local original_size=$(stat -f%z "$input_file" 2>/dev/null || stat -c%s "$input_file" 2>/dev/null || echo "0")
 
-    # Minify the file (remove comments and docstrings only - safest for f-strings)
-    # Using minimal options to prevent f-string syntax errors with nested quotes
+    # Minify the file with f-string safe settings
+    # Remove only unnecessary whitespace and preserve ALL strings (including f-strings)
     python3 -m python_minifier \
-        --remove-literal-statements \
         --no-combine-imports \
         --no-remove-annotations \
         --no-hoist-literals \
         --no-rename-locals \
+        --no-constant-folding \
+        --no-remove-builtin-exception-brackets \
+        --no-convert-posargs-to-args \
         --output "$temp_file" \
         "$input_file"
 
     if [ $? -eq 0 ] && [ -s "$temp_file" ]; then
-        # Calculate new size
-        local new_size=$(stat -f%z "$temp_file" 2>/dev/null || stat -c%s "$temp_file" 2>/dev/null || echo "0")
-        local reduction_percent=0
+        # Validate syntax of minified file before using it
+        if python3 -c "import ast; ast.parse(open('$temp_file').read())" 2>/dev/null; then
+            # Calculate new size
+            local new_size=$(stat -f%z "$temp_file" 2>/dev/null || stat -c%s "$temp_file" 2>/dev/null || echo "0")
+            local reduction_percent=0
 
-        if [ "$original_size" -gt 0 ]; then
-            reduction_percent=$(( (original_size - new_size) * 100 / original_size ))
+            if [ "$original_size" -gt 0 ]; then
+                reduction_percent=$(( (original_size - new_size) * 100 / original_size ))
+            fi
+
+            # Replace original with minified version
+            mv "$temp_file" "$input_file"
+            log_success "  Reduced by ${reduction_percent}% (${original_size} → ${new_size} bytes)"
+        else
+            log_warning "  Minified file has syntax errors, keeping original"
+            rm -f "$temp_file"
+            return 0  # Not a failure, just fallback to original
         fi
-
-        # Replace original with minified version
-        mv "$temp_file" "$input_file"
-        log_success "  Reduced by ${reduction_percent}% (${original_size} → ${new_size} bytes)"
     else
         log_error "  Failed to minify, keeping original"
         rm -f "$temp_file"
@@ -115,9 +124,17 @@ minify_directory() {
 
     local file_count=0
     local success_count=0
+    local excluded_count=0
 
-    # Find all Python files and minify them
+    # Find all Python files and minify them (excluding axis extractor)
     while IFS= read -r -d '' file; do
+        # Check if file should be excluded
+        if [[ "$file" == *"axis_bank_extractor.py" ]] || [[ "$file" == *"sbi_bank_extractor.py" ]]; then
+            log_warning "Excluding from minification: $(basename "$file")"
+            ((excluded_count++))
+            continue
+        fi
+
         ((file_count++))
         if minify_file "$file"; then
             ((success_count++))
@@ -128,6 +145,9 @@ minify_directory() {
         log_warning "No Python files found in $target_dir"
     else
         log_success "Minified $success_count/$file_count Python files in $(basename "$target_dir")"
+        if [ "$excluded_count" -gt 0 ]; then
+            log_info "Excluded $excluded_count files from minification"
+        fi
     fi
 }
 

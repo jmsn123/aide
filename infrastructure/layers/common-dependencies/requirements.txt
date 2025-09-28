@@ -5,6 +5,12 @@
 
 # PDF processing - using pypdf for consistency
 pypdf==5.1.0
+# PDF plumber for advanced table extraction (required by Axis Bank extractor)
+pdfplumber==0.11.4
+# Explicit pdfminer.six version required by pdfplumber 0.11.4
+pdfminer.six==20231228
+# charset_normalizer required by pdfminer.six for encoding detection
+charset_normalizer
 
 # Cryptography for encrypted PDF support (required by pypdf for AES encryption)
 # CRITICAL: These dependencies are MANDATORY and MUST be built for Lambda platform

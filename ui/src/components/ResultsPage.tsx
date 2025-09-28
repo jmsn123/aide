@@ -32,8 +32,6 @@ interface TransactionItem {
 }
 
 interface StatementData {
-  total_transactions: number
-  processed_at: string
   statement_metadata: {
     bank_name: string
     currency: string
@@ -49,7 +47,7 @@ interface StatementData {
       to_date: string
     }
   }
-  financial_summary: {
+  financial_summary?: {
     opening_balance: number
     closing_balance: number
     total_debits: number
@@ -61,7 +59,15 @@ interface StatementData {
       to_date: string
     }
   }
-  transactions?: TransactionItem[]
+  original_filename?: string
+  processing_completed_at?: string
+  upload_timestamp?: string
+  total_transactions?: number
+  data: {
+    transactions?: TransactionItem[]
+    total_transactions?: number
+    processed_at?: string
+  }
 }
 
 export function ResultsPage() {
@@ -102,7 +108,7 @@ export function ResultsPage() {
 
         // Fetch actual statement data from API
         const response = await apiService.fetchStatementData(id)
-        setStatementData(response.data)
+        setStatementData(response)
 
         // Calculate total pages and set initial filtered transactions
         if (response.data.transactions && response.data.transactions.length > 0) {
@@ -124,16 +130,16 @@ export function ResultsPage() {
 
   // Filter transactions when page changes manually
   useEffect(() => {
-    if (statementData?.transactions) {
-      const pageTransactions = statementData.transactions.filter((t: TransactionItem) => t.Page_Number === currentPage)
+    if (statementData?.data?.transactions) {
+      const pageTransactions = statementData.data.transactions.filter((t: TransactionItem) => t.Page_Number === currentPage)
       setFilteredTransactions(pageTransactions)
     }
   }, [currentPage])
 
   const handlePageChange = (page: number) => {
     // Only update if we have transaction data and the page actually has transactions
-    if (statementData?.transactions) {
-      const availablePages = [...new Set(statementData.transactions.map(t => t.Page_Number))]
+    if (statementData?.data?.transactions) {
+      const availablePages = [...new Set(statementData.data.transactions.map(t => t.Page_Number))]
       if (availablePages.includes(page)) {
         setCurrentPage(page)
       }
@@ -165,7 +171,7 @@ export function ResultsPage() {
   }
 
   const getPageSpecificSummary = () => {
-    if (!statementData?.transactions) return null
+    if (!statementData?.data?.transactions) return null
 
     const pageTransactions = filteredTransactions
     const totalAmount = pageTransactions.reduce((sum, t) => sum + (t.Amount_Numeric || 0), 0)
@@ -290,13 +296,13 @@ export function ResultsPage() {
               </div>
               {/* Financial Summary inline with title */}
               <div className="flex items-center gap-4 ml-8 text-sm">
-                <span>Opening: <span className="font-medium">{formatCurrency(statementData.financial_summary.opening_balance)}</span></span>
-                <span className={`${statementData.financial_summary.net_change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  Net: <span className="font-medium">{statementData.financial_summary.net_change >= 0 ? '+' : ''}{formatCurrency(statementData.financial_summary.net_change)}</span>
+                <span>Opening: <span className="font-medium">{formatCurrency(statementData.financial_summary?.opening_balance || 0)}</span></span>
+                <span className={`${(statementData.financial_summary?.net_change || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  Net: <span className="font-medium">{(statementData.financial_summary?.net_change || 0) >= 0 ? '+' : ''}{formatCurrency(statementData.financial_summary?.net_change || 0)}</span>
                 </span>
-                <span className="text-green-600">CR: <span className="font-medium">+{formatCurrency(statementData.financial_summary.total_credits)}</span></span>
-                <span className="text-red-600">DR: <span className="font-medium">{formatCurrency(statementData.financial_summary.total_debits)}</span></span>
-                <span>Closing: <span className="font-semibold">{formatCurrency(statementData.financial_summary.closing_balance)}</span></span>
+                <span className="text-green-600">CR: <span className="font-medium">+{formatCurrency(statementData.financial_summary?.total_credits || 0)}</span></span>
+                <span className="text-red-600">DR: <span className="font-medium">{formatCurrency(statementData.financial_summary?.total_debits || 0)}</span></span>
+                <span>Closing: <span className="font-semibold">{formatCurrency(statementData.financial_summary?.closing_balance || 0)}</span></span>
               </div>
             </div>
             <div className="flex items-center gap-2">

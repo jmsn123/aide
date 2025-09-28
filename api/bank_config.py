@@ -5,14 +5,18 @@ Provides database-driven, high-performance bank extractor management
 """
 
 import importlib
+import importlib.util
 import sys
 import time
 import os
 from typing import Dict, List, Optional, Type
 from functools import lru_cache
+from pathlib import Path
 import boto3
 from boto3.dynamodb.conditions import Key
 import logging
+
+# Import base classes through normal import system to ensure consistency
 from extractors.base_extractor import BaseBankExtractor, SecurityError
 
 logger = logging.getLogger(__name__)
@@ -185,6 +189,12 @@ class BankConfigService:
             raise SecurityError(f"Extractor module must be in extractors package: {module_name}")
 
         try:
+            # Ensure the extractors package is imported first
+            if 'extractors' not in sys.modules:
+                logger.debug("Importing extractors package...")
+                import extractors
+                sys.modules['extractors'] = extractors
+
             # Dynamic import with reload capability for hot updates
             if module_name in sys.modules:
                 logger.debug(f"Reloading existing module: {module_name}")

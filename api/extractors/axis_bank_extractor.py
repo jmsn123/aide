@@ -132,6 +132,7 @@ class AxisBankExtractor(BaseBankExtractor):
     def _extract_metadata_optimized(self, pdf) -> Dict:
         """Extract metadata with corrected patterns for actual PDF format"""
         metadata = {
+            "bank_name": self.bank_name,
             "customer_name": "Not Found",
             "account_number": "Not Found",
             "account_type": "SAVINGS ACCOUNT",
@@ -224,6 +225,7 @@ class AxisBankExtractor(BaseBankExtractor):
             logger.error(f"Error extracting Axis Bank metadata: {e}")
             # Ensure required fields
             metadata.update({
+                "bank_name": self.bank_name,
                 "customer_name": metadata.get("customer_name", "Not Found"),
                 "account_number": metadata.get("account_number", "Not Found"),
                 "account_type": "SAVINGS ACCOUNT",
