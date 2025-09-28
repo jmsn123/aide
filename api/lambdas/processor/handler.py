@@ -54,6 +54,7 @@ def convert_floats_to_decimal(obj):
     else:
         return obj
 
+
 def get_job_data(job_id):
     """Retrieve job data from DynamoDB"""
     try:
@@ -72,11 +73,11 @@ def get_job_data(job_id):
 def handler(event, context):
     """
     AWS Lambda entry point for SQS message processing
-    
+
     Args:
         event: SQS event containing message records
         context: Lambda context object
-        
+
     Returns:
         Processing results
     """

@@ -15,17 +15,10 @@ Please run the bank-statement-extractor and general-purpose agents in parallel f
   established patterns.
 
 --------
-  "Use the bank-statement-extractor agent to implement support for [BANK_NAME] PDF 
-  statements. I have a sample PDF at [PATH]. Please analyze the format and create a 
-  complete extractor following the established patterns."
+  Use the bank-statement-extractor agent to implement support for Bank Of India statement, physical file is in this location '/Users/ramanjaneyulumedikonda/Downloads/bank statements samples/boi original pdf and original excel/kona1006.pdf' this odf file is password protected, and password is kona1006, use password to unlock the file.
+  Please analyze the format and create a 
+  complete extractor following the established patterns.
 
-  For Multiple Agents in Parallel:
-
-  "Please run agents in parallel to:
-  1. Use bank-statement-extractor agent to create the extractor implementation
-  2. Use general-purpose agent to update the database configuration
+  Use bank-statement-extractor agent to create the extractor implementation
 -----------
 
-NOtes: You're absolutely right! I can see there are still string matching patterns that aren't
-  sustainable. Let me implement a completely different approach that doesn't rely on
-  transaction description patterns at all.
