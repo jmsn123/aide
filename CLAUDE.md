@@ -45,7 +45,34 @@ terraform apply                 # Deploy function updates only
 # Individual build commands
 ./scripts/build-layers.sh       # Build Lambda layers only
 ./scripts/build-functions.sh    # Build Lambda functions only
+./scripts/validate-layers.sh    # Validate built layers (optional)
 ```
+
+## **CRITICAL: Lambda Layer Build Policy**
+
+**STRICT BUILD MODE** - The layer build process enforces the following to ensure Lambda compatibility:
+
+### ⚠️ **NO FALLBACKS POLICY**
+- If platform-specific dependency installation fails, the build **FAILS IMMEDIATELY**
+- No fallback to local system packages (which would break in Lambda)
+- This prevents silent compatibility issues
+
+### 🔒 **Mandatory Dependencies**
+- **Cryptography validation**: Ensures encrypted PDF support works
+- **CFFI backend verification**: Required for cryptography in Lambda
+- **Platform compatibility**: All packages built for `manylinux2014_x86_64`
+
+### 🚫 **What Changed (Breaking)**
+- **Removed fallback pip installs** that installed incompatible local packages
+- **Added strict validation** that fails build if critical dependencies missing
+- **Build fails fast** rather than creating broken layers
+
+### ✅ **Why This Matters**
+- **Prevents runtime errors** like "cryptography>=3.1 is required for AES algorithm"
+- **Ensures encrypted PDFs work** consistently in Lambda environment
+- **No silent failures** that only appear during production processing
+
+Run `./scripts/validate-layers.sh` after building to verify all dependencies are properly installed.
 
 ## Architecture Overview
 
