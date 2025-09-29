@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from './components/Header'
 import { Footer } from './components/Footer'
@@ -7,6 +7,8 @@ import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
 import { FileUploadModal } from './components/FileUploadModal'
 import { SuccessDialog } from './components/SuccessDialog'
+import { SmartPagination } from './components/ui/pagination'
+import { PaginationInfo } from './components/PaginationInfo'
 import { FileText, Building, Upload, Shield, AlertCircle, Clock, Info, Eye, Download, Loader2 } from 'lucide-react'
 import { apiService, ApiError } from './services/api'
 import type { BankStatement } from './services/api'
@@ -21,7 +23,56 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [downloadingExcel, setDownloadingExcel] = useState<string | null>(null)
-  
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [isPageChanging, setIsPageChanging] = useState(false)
+
+  // Pagination calculations
+  const paginationData = useMemo(() => {
+    const totalItems = bankStatements.length
+    const totalPages = Math.ceil(totalItems / itemsPerPage)
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    const currentItems = bankStatements.slice(startIndex, endIndex)
+
+    return {
+      totalItems,
+      totalPages,
+      currentItems,
+      startIndex,
+      endIndex
+    }
+  }, [bankStatements, currentPage, itemsPerPage])
+
+  // Pagination handlers
+  const handlePageChange = (page: number) => {
+    setIsPageChanging(true)
+    setCurrentPage(page)
+
+    // Smooth scroll to top of table with loading animation
+    document.querySelector('.statements-table')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start'
+    })
+
+    // Reset loading state after animation
+    setTimeout(() => {
+      setIsPageChanging(false)
+    }, 300)
+  }
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage)
+    setCurrentPage(1) // Reset to first page when changing items per page
+  }
+
+  // Reset pagination when new data is fetched
+  const resetPagination = () => {
+    setCurrentPage(1)
+  }
+
   const handleReset = () => {
     // No-op for simplified header
   }
@@ -33,6 +84,7 @@ function App() {
 
       const statements = await apiService.fetchStatements()
       setBankStatements(statements)
+      resetPagination() // Reset pagination when new data is loaded
 
     } catch (error) {
       const errorMessage = error instanceof ApiError
@@ -259,7 +311,20 @@ function App() {
           )}
 
           {/* Statements Table */}
-          <div className="bg-card border border-border rounded-lg overflow-hidden">
+          <div className="bg-card border border-border rounded-lg overflow-hidden statements-table">
+            {/* Pagination Info - Top */}
+            {paginationData.totalItems > 0 && (
+              <div className="px-6 py-4 border-b border-border bg-muted/30">
+                <PaginationInfo
+                  currentPage={currentPage}
+                  totalPages={paginationData.totalPages}
+                  totalItems={paginationData.totalItems}
+                  itemsPerPage={itemsPerPage}
+                  onItemsPerPageChange={handleItemsPerPageChange}
+                />
+              </div>
+            )}
+
             <div className="min-w-full">
               <Table className="w-full" style={{tableLayout: 'fixed'}}>
               <TableHeader>
@@ -293,7 +358,7 @@ function App() {
                   <TableHead className="w-[20%]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody className={`transition-opacity duration-300 ${isPageChanging ? 'opacity-50' : 'opacity-100'}`}>
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8">
@@ -303,7 +368,7 @@ function App() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : bankStatements.length === 0 ? (
+                ) : paginationData.totalItems === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8">
                       <div className="text-muted-foreground">
@@ -314,7 +379,7 @@ function App() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  bankStatements.map((statement) => (
+                  paginationData.currentItems.map((statement) => (
                     <TableRow key={statement.id}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
@@ -382,6 +447,25 @@ function App() {
               </TableBody>
               </Table>
             </div>
+
+            {/* Pagination Controls - Bottom */}
+            {paginationData.totalPages > 1 && (
+              <div className="px-6 py-4 border-t border-border bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {paginationData.startIndex + 1} to{' '}
+                    {Math.min(paginationData.endIndex, paginationData.totalItems)} of{' '}
+                    {paginationData.totalItems} entries
+                  </div>
+                  <SmartPagination
+                    currentPage={currentPage}
+                    totalPages={paginationData.totalPages}
+                    onPageChange={handlePageChange}
+                    className="justify-end"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
