@@ -62,11 +62,11 @@ def get_job_data(job_id):
         response = table.get_item(Key={'job_id': job_id})
 
         if 'Item' not in response:
-            raise ValueError(f"Job not found: {job_id}")
+            raise ValueError("Job not found: %s" % job_id)
 
         return response['Item']
     except Exception as e:
-        logger.error(f"Failed to retrieve job data: {e}")
+        logger.error("Failed to retrieve job data: %s", e)
         raise
 
 
@@ -82,11 +82,7 @@ def handler(event, context):
         Processing results
     """
     try:
-        logger.info("Processor Lambda invocation started", extra={
-            "request_id": context.aws_request_id,
-            "function_name": context.function_name,
-            "records_count": len(event.get('Records', []))
-        })
+        logger.info("Processor Lambda invocation started - Request ID: %s, Function: %s, Records: %d", context.aws_request_id, context.function_name, len(event.get('Records', [])))
         
         results = []
         
@@ -96,22 +92,14 @@ def handler(event, context):
                 result = process_message(record, context)
                 results.append(result)
             except Exception as e:
-                logger.error("Failed to process SQS record", extra={
-                    "request_id": context.aws_request_id,
-                    "message_id": record.get('messageId'),
-                    "error": str(e)
-                }, exc_info=True)
+                logger.error("Failed to process SQS record - Request ID: %s, Message ID: %s, Error: %s", context.aws_request_id, record.get('messageId'), str(e), exc_info=True)
                 results.append({
                     "messageId": record.get('messageId'),
                     "status": "failed",
                     "error": str(e)
                 })
         
-        logger.info("Processor Lambda completed", extra={
-            "request_id": context.aws_request_id,
-            "processed": len(results),
-            "successful": len([r for r in results if r.get("status") == "success"])
-        })
+        logger.info("Processor Lambda completed - Processed: %d, Successful: %d", len(results), len([r for r in results if r.get('status') == 'success']))
         
         return {
             "statusCode": 200,
@@ -152,10 +140,7 @@ def process_message(record: Dict, context) -> Dict:
         # Parse SQS message body
         message_body = json.loads(record['body'])
 
-        logger.info("Processing SQS message", extra={
-            "message_id": message_id,
-            "message_body": message_body
-        })
+        logger.info("Processing SQS message - ID: %s", message_id)
 
         job_id = message_body.get('job_id')
         s3_key = message_body.get('s3_key')
@@ -168,7 +153,7 @@ def process_message(record: Dict, context) -> Dict:
                 "s3_key": s3_key,
                 "message_body": message_body
             })
-            raise ValueError(f"Missing required job_id or s3_key in message. job_id: {job_id}, s3_key: {s3_key}")
+            raise ValueError("Missing required job_id or s3_key in message. job_id: %s, s3_key: %s" % (job_id, s3_key))
 
         # Retrieve job data from DynamoDB to get password and bank information
         job_data = get_job_data(job_id)
@@ -176,25 +161,20 @@ def process_message(record: Dict, context) -> Dict:
         # Get password if exists
         password = job_data.get('password')
         if password:
-            logger.info(f"Password found for job: {job_id}, length: {len(password)}")
+            logger.info("Password found for job: %s, length: %d", job_id, len(password))
         else:
-            logger.info(f"No password for job: {job_id}")
+            logger.info("No password for job: %s", job_id)
 
         # Get bank information from metadata
         metadata = job_data.get('metadata', {})
         bank_id = metadata.get('bank_id')
         bank_name = metadata.get('bank_name')
         if bank_id:
-            logger.info(f"Bank ID found for job: {job_id}, bank: {bank_name} ({bank_id})")
+            logger.info("Bank ID found for job: %s, bank: %s (%s)", job_id, bank_name, bank_id)
         else:
-            logger.info(f"No bank ID specified for job: {job_id}")
+            logger.info("No bank ID specified for job: %s", job_id)
         
-        logger.info("Processing PDF job", extra={
-            "job_id": job_id,
-            "s3_key": s3_key,
-            "user_id": user_id,
-            "message_id": message_id
-        })
+        logger.info("Processing PDF job - Job ID: %s, S3 Key: %s, User ID: %s, Message ID: %s", job_id, s3_key, user_id, message_id)
         
         # Update job status to processing
         update_job_status(job_id, "processing", {"started_at": context.aws_request_id})
@@ -265,7 +245,7 @@ def process_message(record: Dict, context) -> Dict:
         except ValueError as ve:
             # Handle unrecognized bank statement format
             if "Unrecognized bank statement format" in str(ve):
-                logger.warning(f"Unrecognized bank statement format for job {job_id}: {ve}")
+                logger.warning("Unrecognized bank statement format for job %s: %s", job_id, ve)
                 update_job_status(job_id, "failed", {
                     "failed_at": context.aws_request_id,
                     "error": str(ve),
@@ -292,20 +272,20 @@ def process_message(record: Dict, context) -> Dict:
                 financial_summary = extraction_result.get('financial_summary', {})
 
                 # Upload complete results to S3
-                results_key = f"results/{job_id}/transactions.json"
+                results_key = "results/%s/transactions.json" % job_id
                 upload_complete_results_to_s3(results_key, extraction_result)
 
                 # Generate and upload Excel file
                 excel_s3_key = None
                 if transactions:  # Only generate Excel if we have transactions
                     try:
-                        logger.info(f"Generating Excel file for job {job_id} with {len(transactions)} transactions")
+                        logger.info("Generating Excel file for job %s with %d transactions", job_id, len(transactions))
                         excel_buffer = create_excel_workbook(transactions)
-                        excel_s3_key = f"results/{job_id}/statement.xlsx"
+                        excel_s3_key = "results/%s/statement.xlsx" % job_id
                         upload_excel_to_s3(excel_s3_key, excel_buffer, job_id)
-                        logger.info(f"Excel file generated and uploaded successfully for job {job_id}")
+                        logger.info("Excel file generated and uploaded successfully for job %s", job_id)
                     except Exception as e:
-                        logger.error(f"Failed to generate Excel file for job {job_id}: {e}", exc_info=True)
+                        logger.error("Failed to generate Excel file for job %s: %s", job_id, e, exc_info=True)
                         # Continue processing even if Excel generation fails
                         excel_s3_key = None
 
@@ -327,20 +307,20 @@ def process_message(record: Dict, context) -> Dict:
                 transactions = extraction_result if extraction_result else []
 
                 # Upload legacy results to S3
-                results_key = f"results/{job_id}/transactions.json"
+                results_key = "results/%s/transactions.json" % job_id
                 upload_results_to_s3(results_key, transactions)
 
                 # Generate and upload Excel file
                 excel_s3_key = None
                 if transactions:  # Only generate Excel if we have transactions
                     try:
-                        logger.info(f"Generating Excel file for legacy format job {job_id} with {len(transactions)} transactions")
+                        logger.info("Generating Excel file for legacy format job %s with %d transactions", job_id, len(transactions))
                         excel_buffer = create_excel_workbook(transactions)
-                        excel_s3_key = f"results/{job_id}/statement.xlsx"
+                        excel_s3_key = "results/%s/statement.xlsx" % job_id
                         upload_excel_to_s3(excel_s3_key, excel_buffer, job_id)
-                        logger.info(f"Excel file generated and uploaded successfully for legacy job {job_id}")
+                        logger.info("Excel file generated and uploaded successfully for legacy job %s", job_id)
                     except Exception as e:
-                        logger.error(f"Failed to generate Excel file for legacy job {job_id}: {e}", exc_info=True)
+                        logger.error("Failed to generate Excel file for legacy job %s: %s", job_id, e, exc_info=True)
                         # Continue processing even if Excel generation fails
                         excel_s3_key = None
 
@@ -404,7 +384,7 @@ def download_from_s3(s3_key: str) -> bytes:
         response = s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=s3_key)
         return response['Body'].read()
     except Exception as e:
-        logger.error(f"Failed to download from S3: {s3_key}", exc_info=True)
+        logger.error("Failed to download from S3: %s", s3_key, exc_info=True)
         raise
 
 def upload_results_to_s3(s3_key: str, transactions: List[Dict]) -> None:
@@ -423,7 +403,7 @@ def upload_results_to_s3(s3_key: str, transactions: List[Dict]) -> None:
             ContentType='application/json'
         )
     except Exception as e:
-        logger.error(f"Failed to upload results to S3: {s3_key}", exc_info=True)
+        logger.error("Failed to upload results to S3: %s", s3_key, exc_info=True)
         raise
 
 def upload_complete_results_to_s3(s3_key: str, complete_data: Dict) -> None:
@@ -435,9 +415,9 @@ def upload_complete_results_to_s3(s3_key: str, complete_data: Dict) -> None:
             Body=json.dumps(complete_data, default=str, indent=2),
             ContentType='application/json'
         )
-        logger.info(f"Uploaded complete results to S3: {s3_key}")
+        logger.info("Uploaded complete results to S3: %s", s3_key)
     except Exception as e:
-        logger.error(f"Failed to upload complete results to S3: {s3_key}", exc_info=True)
+        logger.error("Failed to upload complete results to S3: %s", s3_key, exc_info=True)
         raise
 
 def upload_excel_to_s3(s3_key: str, excel_buffer, job_id: str) -> None:
@@ -449,9 +429,9 @@ def upload_excel_to_s3(s3_key: str, excel_buffer, job_id: str) -> None:
             Body=excel_buffer.getvalue(),
             ContentType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-        logger.info(f"Uploaded Excel file to S3: {s3_key} for job {job_id}")
+        logger.info("Uploaded Excel file to S3: %s for job %s", s3_key, job_id)
     except Exception as e:
-        logger.error(f"Failed to upload Excel file to S3: {s3_key} for job {job_id}", exc_info=True)
+        logger.error("Failed to upload Excel file to S3: %s for job %s", s3_key, job_id, exc_info=True)
         raise
 
 def update_job_status(job_id: str, status: str, additional_data: Dict = None) -> None:
@@ -469,9 +449,9 @@ def update_job_status(job_id: str, status: str, additional_data: Dict = None) ->
         
         if additional_data:
             for key, value in additional_data.items():
-                update_expression += f", #{key} = :{key}"
-                expression_attribute_names[f"#{key}"] = key
-                expression_attribute_values[f":{key}"] = convert_floats_to_decimal(value)
+                update_expression += ", #%s = :%s" % (key, key)
+                expression_attribute_names["#%s" % key] = key
+                expression_attribute_values[":%s" % key] = convert_floats_to_decimal(value)
         
         table.update_item(
             Key={"job_id": job_id},
@@ -480,8 +460,8 @@ def update_job_status(job_id: str, status: str, additional_data: Dict = None) ->
             ExpressionAttributeValues=expression_attribute_values
         )
         
-        logger.info(f"Updated job status to {status}", extra={"job_id": job_id})
+        logger.info("Updated job status to %s for job %s", status, job_id)
         
     except Exception as e:
-        logger.error(f"Failed to update job status in DynamoDB: {job_id} - {e}", exc_info=True)
+        logger.error("Failed to update job status in DynamoDB: %s - %s", job_id, e, exc_info=True)
         # Don't raise here as this is not critical to the processing

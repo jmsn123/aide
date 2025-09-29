@@ -73,11 +73,11 @@ minify_file() {
     # Calculate original size
     local original_size=$(stat -f%z "$input_file" 2>/dev/null || stat -c%s "$input_file" 2>/dev/null || echo "0")
 
-    # Step 1: Check if file contains f-strings
+    # Step 1: Check if file contains f-strings (comprehensive detection)
     local has_fstrings=false
-    if grep -q "f[\"']" "$input_file" || grep -q 'f"""' "$input_file" || grep -q "f'''" "$input_file"; then
+    if grep -Eq "f[\"']|f\"\"\"|f'''|F[\"']|F\"\"\"|F'''" "$input_file"; then
         has_fstrings=true
-        log_info "  Detected f-strings, using enhanced safe mode"
+        log_info "  Detected f-strings, using ultra-safe mode with no variable renaming"
     fi
 
     # Step 2: Pre-process to remove comments and docstrings safely
@@ -160,8 +160,8 @@ except Exception as e:
     local minifier_success=false
 
     if [ "$has_fstrings" = true ]; then
-        # Safe mode for f-strings - minimal minification
-        log_info "  Applying f-string safe minification..."
+        # Ultra-safe mode for f-strings - disable all variable renaming and dangerous transformations
+        log_info "  Applying f-string ultra-safe minification (no variable renaming)..."
         python3 -m python_minifier \
             --no-combine-imports \
             --no-remove-annotations \
@@ -170,6 +170,7 @@ except Exception as e:
             --no-constant-folding \
             --no-remove-builtin-exception-brackets \
             --no-convert-posargs-to-args \
+            --remove-literal-statements \
             --output "$temp_file" \
             "$preprocessed_file" && minifier_success=true
     else

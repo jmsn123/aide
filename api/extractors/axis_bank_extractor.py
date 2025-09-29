@@ -97,7 +97,7 @@ class AxisBankExtractor(BaseBankExtractor):
         try:
             # Open PDF with pdfplumber (handles password automatically)
             with pdfplumber.open(pdf_path, password=password) as pdf:
-                logger.info(f"Processing Axis Bank statement with {len(pdf.pages)} pages")
+                logger.info("Processing Axis Bank statement with %d pages", len(pdf.pages))
 
                 # Step 1: Extract metadata using targeted regex
                 self.statement_metadata = self._extract_metadata_optimized(pdf)
@@ -117,13 +117,13 @@ class AxisBankExtractor(BaseBankExtractor):
                     'extraction_metadata': self.get_extraction_metadata()
                 }
 
-                logger.info(f"Axis Bank extraction completed: {len(self.transactions)} transactions, "
-                          f"Balance verified: {financial_summary.get('balance_verified', False)}")
+                logger.info("Axis Bank extraction completed: %d transactions, Balance verified: %s",
+                          len(self.transactions), financial_summary.get('balance_verified', False))
 
                 return result
 
         except Exception as e:
-            logger.error(f"Error extracting Axis Bank statement from {pdf_path}: {e}")
+            logger.error("Error extracting Axis Bank statement from %s: %s", pdf_path, e)
             raise
         finally:
             # Clear caches to free memory
@@ -219,10 +219,10 @@ class AxisBankExtractor(BaseBankExtractor):
 
             # Account type is already set in default metadata
 
-            logger.info(f"Extracted Axis Bank metadata for account: {metadata.get('account_number', 'Unknown')}")
+            logger.info("Extracted Axis Bank metadata for account: %s", metadata.get('account_number', 'Unknown'))
 
         except Exception as e:
-            logger.error(f"Error extracting Axis Bank metadata: {e}")
+            logger.error("Error extracting Axis Bank metadata: %s", e)
             # Ensure required fields
             metadata.update({
                 "bank_name": self.bank_name,
@@ -244,7 +244,7 @@ class AxisBankExtractor(BaseBankExtractor):
             # Method 1: Try pdfplumber for table extraction
             transactions = self._extract_with_pdfplumber_optimized(pdf)
             if transactions:
-                logger.info(f"PDFPlumber extracted {len(transactions)} transactions")
+                logger.info("PDFPlumber extracted %d transactions", len(transactions))
                 return transactions
 
             # Method 2: Fallback to optimized text parsing
@@ -252,7 +252,7 @@ class AxisBankExtractor(BaseBankExtractor):
             transactions = self._extract_with_text_parsing_optimized(pdf)
 
         except Exception as e:
-            logger.error(f"Error in optimized extraction: {e}")
+            logger.error("Error in optimized extraction: %s", e)
 
         return transactions
 
@@ -291,11 +291,11 @@ class AxisBankExtractor(BaseBankExtractor):
                                 transactions.append(transaction)
 
                 except Exception as page_error:
-                    logger.warning(f"Error processing page {page_num}: {page_error}")
+                    logger.warning("Error processing page %d: %s", page_num, page_error)
                     continue  # Continue with next page
 
         except Exception as e:
-            logger.error(f"PDFPlumber optimized extraction error: {e}")
+            logger.error("PDFPlumber optimized extraction error: %s", e)
             return []  # Return empty list instead of raising
 
         return transactions
@@ -324,7 +324,7 @@ class AxisBankExtractor(BaseBankExtractor):
                             sno_counter += 1
 
         except Exception as e:
-            logger.error(f"Error in optimized text parsing: {e}")
+            logger.error("Error in optimized text parsing: %s", e)
 
         return transactions
 
@@ -354,7 +354,7 @@ class AxisBankExtractor(BaseBankExtractor):
             return self._parse_with_amount_detection(parts, sno, page_num)
 
         except Exception as e:
-            logger.warning(f"Error parsing transaction line '{line[:50]}...': {e}")
+            logger.warning("Error parsing transaction line '%s...': %s", line[:50], e)
             return None
 
     def _parse_deterministic_columns(self, parts: List[str], sno: int, page_num: int) -> Optional[Dict]:
@@ -415,7 +415,7 @@ class AxisBankExtractor(BaseBankExtractor):
             }
 
         except Exception as e:
-            logger.debug(f"Deterministic parsing failed: {e}")
+            logger.debug("Deterministic parsing failed: %s", e)
             return None
 
     def _is_credit_transaction(self, description: str) -> bool:
@@ -460,7 +460,7 @@ class AxisBankExtractor(BaseBankExtractor):
                     description_parts.append(part)
 
             if not amounts:
-                logger.debug(f"No amounts found in transaction line")
+                logger.debug("No amounts found in transaction line")
                 return None
 
             # More robust amount assignment
@@ -490,7 +490,7 @@ class AxisBankExtractor(BaseBankExtractor):
             }
 
         except Exception as e:
-            logger.warning(f"Amount detection parsing failed: {e}")
+            logger.warning("Amount detection parsing failed: %s", e)
             return None
 
     def _create_transaction_from_row(self, row: List, row_idx: int, page_num: int) -> Optional[Dict]:
@@ -531,7 +531,7 @@ class AxisBankExtractor(BaseBankExtractor):
             return transaction
 
         except Exception as e:
-            logger.warning(f"Error creating transaction from row: {e}")
+            logger.warning("Error creating transaction from row: %s", e)
             return None
 
     def _is_valid_date(self, date_str: str) -> bool:
@@ -569,7 +569,7 @@ class AxisBankExtractor(BaseBankExtractor):
             summary['net_change'] = credits_total - debits_total
 
             if calculation_errors:
-                logger.warning(f"Found {len(calculation_errors)} transaction calculation errors")
+                logger.warning("Found %d transaction calculation errors", len(calculation_errors))
                 summary['verification_details']['calculation_errors'] = calculation_errors
 
             # Step 3: Determine closing balance with fallback hierarchy
@@ -584,7 +584,7 @@ class AxisBankExtractor(BaseBankExtractor):
             summary.update(verification_result)
 
         except Exception as e:
-            logger.error(f"Error calculating financial summary: {e}", exc_info=True)
+            logger.error("Error calculating financial summary: %s", e, exc_info=True)
             summary['verification_details']['calculation_error'] = str(e)
 
         return summary
@@ -608,11 +608,11 @@ class AxisBankExtractor(BaseBankExtractor):
                 if first_balance is not None:
                     # Opening = Current Balance - Credit + Debit
                     calculated_opening = first_balance - first_credit + first_debit
-                    logger.info(f"Calculated opening balance from first transaction: {calculated_opening}")
+                    logger.info("Calculated opening balance from first transaction: %f", calculated_opening)
                     return calculated_opening, 'calculated_from_first_transaction'
 
             except Exception as e:
-                logger.warning(f"Failed to calculate opening balance from first transaction: {e}")
+                logger.warning("Failed to calculate opening balance from first transaction: %s", e)
 
         # Method 3: Default fallback
         logger.warning("Using default opening balance of 0.0 - this may affect verification")
@@ -633,7 +633,7 @@ class AxisBankExtractor(BaseBankExtractor):
                 if last_balance is not None:
                     return last_balance, 'last_transaction_balance'
             except Exception as e:
-                logger.warning(f"Failed to extract closing balance from last transaction: {e}")
+                logger.warning("Failed to extract closing balance from last transaction: %s", e)
 
         # Method 3: Default fallback
         logger.warning("Using default closing balance of 0.0 - this may affect verification")
@@ -658,9 +658,9 @@ class AxisBankExtractor(BaseBankExtractor):
                     total_debits += debit_amount
 
             except Exception as e:
-                error_msg = f"Transaction {i+1}: {str(e)}"
+                error_msg = "Transaction %d: %s" % (i+1, str(e))
                 errors.append(error_msg)
-                logger.debug(f"Error processing transaction {i+1}: {e}")
+                logger.debug("Error processing transaction %d: %s", i+1, e)
 
         return total_credits, total_debits, errors
 
@@ -675,7 +675,7 @@ class AxisBankExtractor(BaseBankExtractor):
             if clean_amount and clean_amount.replace('.', '').isdigit():
                 return float(clean_amount)
         except (ValueError, AttributeError) as e:
-            logger.debug(f"Failed to parse amount '{amount_str}': {e}")
+            logger.debug("Failed to parse amount '%s': %s", amount_str, e)
 
         return None
 
@@ -717,15 +717,15 @@ class AxisBankExtractor(BaseBankExtractor):
                 verification['balance_verified'] = True
                 verification['balance_calculation_method'] = 'verified_within_tolerance'
                 verification['verification_details']['tolerance_used'] = tolerance_relaxed
-                logger.info(f"Balance verified within relaxed tolerance: {balance_difference} rupees")
+                logger.info("Balance verified within relaxed tolerance: %f rupees", balance_difference)
             else:
                 verification['balance_verified'] = False
                 verification['balance_calculation_method'] = 'verification_failed'
-                logger.warning(f"Balance verification failed: difference of {balance_difference} rupees "
-                             f"exceeds tolerance of {tolerance_relaxed}")
+                logger.warning("Balance verification failed: difference of %f rupees exceeds tolerance of %f",
+                             balance_difference, tolerance_relaxed)
 
         except Exception as e:
-            logger.error(f"Error in balance verification: {e}")
+            logger.error("Error in balance verification: %s", e)
             verification['verification_details']['verification_error'] = str(e)
 
         return verification
@@ -748,10 +748,10 @@ class AxisBankExtractor(BaseBankExtractor):
                 self._page_text_cache[page_index] = extracted_text
                 return extracted_text
             else:
-                logger.warning(f"Page index {page_index} out of range for PDF with {len(pdf.pages)} pages")
+                logger.warning("Page index %d out of range for PDF with %d pages", page_index, len(pdf.pages))
                 return ""
         except Exception as e:
-            logger.error(f"Error extracting text from page {page_index}: {e}")
+            logger.error("Error extracting text from page %d: %s", page_index, e)
             return ""
 
     def _safe_extract_tables(self, page, page_num: int = None) -> List:
@@ -771,7 +771,7 @@ class AxisBankExtractor(BaseBankExtractor):
             self._tables_cache[cache_key] = extracted_tables
             return extracted_tables
         except Exception as e:
-            logger.debug(f"Error extracting tables from page {cache_key}: {e}")
+            logger.debug("Error extracting tables from page %s: %s", cache_key, e)
             return []
 
     def _clear_cache(self):
@@ -787,12 +787,12 @@ class AxisBankExtractor(BaseBankExtractor):
             required_fields = ['Date', 'Remarks', 'Balance']
             for field in required_fields:
                 if not transaction.get(field):
-                    logger.debug(f"Transaction missing required field: {field}")
+                    logger.debug("Transaction missing required field: %s", field)
                     return False
 
             # Date validation
             if not self._is_valid_date(transaction['Date']):
-                logger.debug(f"Invalid date format: {transaction['Date']}")
+                logger.debug("Invalid date format: %s", transaction['Date'])
                 return False
 
             # Amount validation (at least one of Debit or Credit should be present for non-balance transactions)
@@ -806,7 +806,7 @@ class AxisBankExtractor(BaseBankExtractor):
             return True
 
         except Exception as e:
-            logger.warning(f"Error validating transaction: {e}")
+            logger.warning("Error validating transaction: %s", e)
             return False
 
     def _handle_extraction_error(self, error: Exception, context: str,
@@ -819,10 +819,10 @@ class AxisBankExtractor(BaseBankExtractor):
             'timestamp': datetime.now().isoformat()
         }
 
-        logger.error(f"Extraction error in {context}: {error}", exc_info=True)
+        logger.error("Extraction error in %s: %s", context, error, exc_info=True)
 
         if fallback_data:
-            logger.info(f"Returning fallback data for {context}")
+            logger.info("Returning fallback data for %s", context)
             return fallback_data
 
         # Return minimal valid structure

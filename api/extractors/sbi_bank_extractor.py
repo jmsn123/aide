@@ -106,7 +106,7 @@ class SBIBankExtractor(BaseBankExtractor):
         try:
             # Open PDF with pdfplumber (handles password automatically)
             with pdfplumber.open(pdf_path, password=password) as pdf:
-                logger.info(f"Processing SBI Bank statement with {len(pdf.pages)} pages")
+                logger.info("Processing SBI Bank statement with %d pages", len(pdf.pages))
 
                 # Step 1: Extract metadata from header sections
                 self.statement_metadata = self._extract_metadata_sbi(pdf)
@@ -145,13 +145,13 @@ class SBIBankExtractor(BaseBankExtractor):
                     "extractor_metadata": self.get_extraction_metadata()
                 }
 
-                logger.info(f"SBI Bank extraction completed: {len(self.transactions)} transactions, "
-                          f'Balance verified: {financial_summary.get("balance_verified", False)}')
+                logger.info("SBI Bank extraction completed: %d transactions, Balance verified: %s",
+                          len(self.transactions), financial_summary.get("balance_verified", False))
 
                 return result
 
         except Exception as e:
-            logger.error(f"Error extracting SBI Bank statement from {pdf_path}: {e}")
+            logger.error("Error extracting SBI Bank statement from %s: %s", pdf_path, e)
             raise
         finally:
             # Clear caches to free memory
@@ -228,10 +228,10 @@ class SBIBankExtractor(BaseBankExtractor):
                 dr_cr = opening_match.group(2) if opening_match.group(2) else 'CR'
                 metadata["opening_balance"] = amount if dr_cr == 'CR' else -amount
 
-            logger.info(f"Extracted SBI Bank metadata for account: {metadata.get('account_number', 'Unknown')}")
+            logger.info("Extracted SBI Bank metadata for account: %s", metadata.get('account_number', 'Unknown'))
 
         except Exception as e:
-            logger.error(f"Error extracting SBI Bank metadata: {e}")
+            logger.error("Error extracting SBI Bank metadata: %s", e)
 
         return metadata
 
@@ -262,7 +262,7 @@ class SBIBankExtractor(BaseBankExtractor):
                     return customer_name.strip()
 
         except Exception as e:
-            logger.debug(f"Error extracting customer name: {e}")
+            logger.debug("Error extracting customer name: %s", e)
         return None
 
     def _normalize_date_format(self, date_str: str) -> str:
@@ -274,10 +274,10 @@ class SBIBankExtractor(BaseBankExtractor):
                 day, month, year = date_str.split('-')
                 year_int = int(year)
                 if year_int <= 50:
-                    full_year = f"20{year}"
+                    full_year = "20" + year
                 else:
-                    full_year = f"19{year}"
-                return f"{day}-{month}-{full_year}"
+                    full_year = "19" + year
+                return "%s-%s-%s" % (day, month, full_year)
             return date_str
         except Exception:
             return date_str
@@ -292,7 +292,7 @@ class SBIBankExtractor(BaseBankExtractor):
             # Method 1: Try table-based extraction first
             transactions = self._extract_with_table_parsing_sbi(pdf)
             if transactions:
-                logger.info(f"Table parsing extracted {len(transactions)} transactions")
+                logger.info("Table parsing extracted %d transactions", len(transactions))
                 return transactions
 
             # Method 2: Fallback to text-based parsing with multi-line handling
@@ -300,7 +300,7 @@ class SBIBankExtractor(BaseBankExtractor):
             transactions = self._extract_with_text_parsing_sbi(pdf)
 
         except Exception as e:
-            logger.error(f"Error in SBI transaction extraction: {e}")
+            logger.error("Error in SBI transaction extraction: %s", e)
 
         return transactions
 
@@ -330,11 +330,11 @@ class SBIBankExtractor(BaseBankExtractor):
                         sno_counter += len(transactions_from_table)
 
                 except Exception as page_error:
-                    logger.warning(f"Error processing page {page_num}: {page_error}")
+                    logger.warning("Error processing page %d: %s", page_num, page_error)
                     continue
 
         except Exception as e:
-            logger.error(f"Table parsing error: {e}")
+            logger.error("Table parsing error: %s", e)
             return []
 
         return transactions
@@ -374,7 +374,7 @@ class SBIBankExtractor(BaseBankExtractor):
                 transactions.append(current_transaction)
 
         except Exception as e:
-            logger.error(f"Error processing SBI transaction table: {e}")
+            logger.error("Error processing SBI transaction table: %s", e)
 
         return transactions
 
@@ -403,7 +403,7 @@ class SBIBankExtractor(BaseBankExtractor):
             return transaction
 
         except Exception as e:
-            logger.warning(f"Error creating transaction from SBI row: {e}")
+            logger.warning("Error creating transaction from SBI row: %s", e)
             return {}
 
     def _extract_with_text_parsing_sbi(self, pdf) -> List[Dict]:
@@ -437,7 +437,7 @@ class SBIBankExtractor(BaseBankExtractor):
                         i += 1
 
         except Exception as e:
-            logger.error(f"Error in SBI text parsing: {e}")
+            logger.error("Error in SBI text parsing: %s", e)
 
         return transactions
 
@@ -532,7 +532,7 @@ class SBIBankExtractor(BaseBankExtractor):
             return transaction, lines_consumed
 
         except Exception as e:
-            logger.warning(f"Error parsing multi-line SBI transaction: {e}")
+            logger.warning("Error parsing multi-line SBI transaction: %s", e)
             return None, 1
 
     def _is_valid_sbi_date(self, date_str: str) -> bool:
@@ -588,7 +588,7 @@ class SBIBankExtractor(BaseBankExtractor):
                 # Convert to signed amount
                 amount_float = float(amount)
                 if dr_cr == 'DR':
-                    return f"-{amount}"
+                    return "-%s" % amount
                 else:
                     return amount
 
@@ -596,7 +596,7 @@ class SBIBankExtractor(BaseBankExtractor):
             return self._clean_amount(balance_str)
 
         except Exception as e:
-            logger.debug(f"Error parsing balance '{balance_str}': {e}")
+            logger.debug("Error parsing balance '%s': %s", balance_str, e)
             return ""
 
     def _is_credit_transaction_sbi(self, description: str) -> bool:
@@ -656,7 +656,7 @@ class SBIBankExtractor(BaseBankExtractor):
                         summary['total_debits'] += debit_amount
 
                 except (ValueError, AttributeError) as e:
-                    logger.debug(f"Error processing transaction amounts: {e}")
+                    logger.debug("Error processing transaction amounts: %s", e)
 
             # Calculate net change
             summary['net_change'] = summary['total_credits'] - summary['total_debits']
@@ -692,7 +692,7 @@ class SBIBankExtractor(BaseBankExtractor):
                 summary['closing_balance'] = expected_closing
 
         except Exception as e:
-            logger.error(f"Error calculating SBI financial summary: {e}")
+            logger.error("Error calculating SBI financial summary: %s", e)
 
         return summary
 
@@ -717,7 +717,7 @@ class SBIBankExtractor(BaseBankExtractor):
             return True
 
         except Exception as e:
-            logger.debug(f"Transaction validation error: {e}")
+            logger.debug("Transaction validation error: %s", e)
             return False
 
     def _safe_extract_page_text(self, pdf, page_index: int) -> str:
@@ -734,7 +734,7 @@ class SBIBankExtractor(BaseBankExtractor):
             else:
                 return ""
         except Exception as e:
-            logger.error(f"Error extracting text from page {page_index}: {e}")
+            logger.error("Error extracting text from page %d: %s", page_index, e)
             return ""
 
     def _safe_extract_tables(self, page, page_num: int) -> List:
@@ -749,7 +749,7 @@ class SBIBankExtractor(BaseBankExtractor):
             self._tables_cache[cache_key] = extracted_tables
             return extracted_tables
         except Exception as e:
-            logger.debug(f"Error extracting tables from page {page_num}: {e}")
+            logger.debug("Error extracting tables from page %s: %s", page_num, e)
             return []
 
     def _clear_cache(self):
