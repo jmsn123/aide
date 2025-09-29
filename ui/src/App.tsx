@@ -7,6 +7,10 @@ import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
 import { FileUploadModal } from './components/FileUploadModal'
 import { SuccessDialog } from './components/SuccessDialog'
+import { SmartPagination } from './components/ui/pagination'
+import { PaginationInfo } from './components/PaginationInfo'
+import { PaginationErrorBoundary } from './components/PaginationErrorBoundary'
+import { usePagination } from './hooks/usePagination'
 import { FileText, Building, Upload, Shield, AlertCircle, Clock, Info, Eye, Download, Loader2 } from 'lucide-react'
 import { apiService, ApiError } from './services/api'
 import type { BankStatement } from './services/api'
@@ -21,7 +25,14 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [downloadingExcel, setDownloadingExcel] = useState<string | null>(null)
-  
+
+  // Pagination using custom hook
+  const pagination = usePagination(bankStatements, {
+    initialItemsPerPage: 10,
+    enableKeyboardNavigation: true,
+    debounceMs: 150
+  })
+
   const handleReset = () => {
     // No-op for simplified header
   }
@@ -33,6 +44,7 @@ function App() {
 
       const statements = await apiService.fetchStatements()
       setBankStatements(statements)
+      pagination.resetPagination() // Reset pagination when new data is loaded
 
     } catch (error) {
       const errorMessage = error instanceof ApiError
@@ -259,7 +271,22 @@ function App() {
           )}
 
           {/* Statements Table */}
-          <div className="bg-card border border-border rounded-lg overflow-hidden">
+          <div className="bg-card border border-border rounded-lg overflow-hidden statements-table">
+            {/* Pagination Info - Top */}
+            {pagination.totalItems > 0 && (
+              <div className="px-6 py-4 border-b border-border bg-muted/30">
+                <PaginationErrorBoundary onReset={pagination.resetPagination}>
+                  <PaginationInfo
+                    currentPage={pagination.currentPage}
+                    totalPages={pagination.totalPages}
+                    totalItems={pagination.totalItems}
+                    itemsPerPage={pagination.itemsPerPage}
+                    onItemsPerPageChange={pagination.handleItemsPerPageChange}
+                  />
+                </PaginationErrorBoundary>
+              </div>
+            )}
+
             <div className="min-w-full">
               <Table className="w-full" style={{tableLayout: 'fixed'}}>
               <TableHeader>
@@ -293,7 +320,7 @@ function App() {
                   <TableHead className="w-[20%]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody className={`transition-opacity duration-300 ${pagination.isPageChanging ? 'opacity-50' : 'opacity-100'}`}>
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8">
@@ -303,7 +330,7 @@ function App() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : bankStatements.length === 0 ? (
+                ) : pagination.totalItems === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8">
                       <div className="text-muted-foreground">
@@ -314,7 +341,7 @@ function App() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  bankStatements.map((statement) => (
+                  pagination.currentItems.map((statement) => (
                     <TableRow key={statement.id}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
@@ -382,6 +409,27 @@ function App() {
               </TableBody>
               </Table>
             </div>
+
+            {/* Pagination Controls - Bottom */}
+            {pagination.totalPages > 1 && (
+              <div className="px-6 py-4 border-t border-border bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {pagination.startIndex + 1} to{' '}
+                    {Math.min(pagination.endIndex, pagination.totalItems)} of{' '}
+                    {pagination.totalItems} entries
+                  </div>
+                  <PaginationErrorBoundary onReset={pagination.resetPagination}>
+                    <SmartPagination
+                      currentPage={pagination.currentPage}
+                      totalPages={pagination.totalPages}
+                      onPageChange={pagination.handlePageChange}
+                      className="justify-end"
+                    />
+                  </PaginationErrorBoundary>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
