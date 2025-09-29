@@ -101,7 +101,9 @@
       "Bash(aws dynamodb get-item:*)",
       "Bash(aws lambda list-layers:*)",
       "Bash(infrastructure/scripts/build-layers.sh:*)",
-      "Bash(./scripts/validate-layers.sh:*)"
+      "Bash(./scripts/validate-layers.sh:*)",
+      "Bash(aws cloudfront create-invalidation:*)",
+      "Bash(./scripts/minify-python.sh:*)"
     ],
     "deny": [],
     "ask": []
