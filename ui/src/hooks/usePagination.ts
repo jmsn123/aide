@@ -1,32 +1,89 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 
+/**
+ * Configuration options for the usePagination hook
+ */
 export interface PaginationOptions {
+  /** Initial page to start on (default: 1) */
   initialPage?: number
+  /** Initial number of items per page (default: 10) */
   initialItemsPerPage?: number
+  /** Enable keyboard navigation with arrow keys (default: true) */
   enableKeyboardNavigation?: boolean
+  /** Debounce delay for keyboard navigation in milliseconds (default: 150) */
   debounceMs?: number
 }
 
+/**
+ * Return type for the usePagination hook containing pagination state and handlers
+ * @template T The type of items being paginated
+ */
 export interface PaginationResult<T> {
   // Data
+  /** Array of items for the current page */
   currentItems: T[]
 
   // State
+  /** Current active page number (1-based) */
   currentPage: number
+  /** Number of items displayed per page */
   itemsPerPage: number
+  /** Total number of items in the dataset */
   totalItems: number
+  /** Total number of pages available */
   totalPages: number
+  /** Zero-based start index for current page items */
   startIndex: number
+  /** Zero-based end index for current page items */
   endIndex: number
+  /** Whether a page change animation is in progress */
   isPageChanging: boolean
 
   // Handlers
+  /** Navigate to a specific page with validation and smooth scrolling */
   handlePageChange: (page: number) => void
+  /** Change the number of items displayed per page */
   handleItemsPerPageChange: (newItemsPerPage: number) => void
+  /** Reset pagination to first page and clear loading states */
   resetPagination: () => void
+  /** Manually control the page changing loading state */
   setIsPageChanging: (isChanging: boolean) => void
 }
 
+/**
+ * Custom hook for managing pagination state and behavior with advanced features
+ *
+ * Features:
+ * - Automatic validation of page numbers and items per page
+ * - Smooth scrolling to table top on page changes
+ * - Debounced keyboard navigation (arrow keys)
+ * - Input field detection to prevent navigation conflicts
+ * - Loading states with opacity transitions
+ * - Error boundary compatible design
+ *
+ * @template T The type of items being paginated
+ * @param items Array of items to paginate
+ * @param options Configuration options for pagination behavior
+ * @returns Pagination state, handlers, and computed values
+ *
+ * @example
+ * ```tsx
+ * const pagination = usePagination(bankStatements, {
+ *   initialItemsPerPage: 10,
+ *   enableKeyboardNavigation: true,
+ *   debounceMs: 150
+ * })
+ *
+ * // Use in JSX
+ * <PaginationInfo
+ *   currentPage={pagination.currentPage}
+ *   totalPages={pagination.totalPages}
+ *   totalItems={pagination.totalItems}
+ *   itemsPerPage={pagination.itemsPerPage}
+ *   onItemsPerPageChange={pagination.handleItemsPerPageChange}
+ * />
+ * ```
+ */
 export function usePagination<T>(
   items: T[],
   options: PaginationOptions = {}
