@@ -57,10 +57,11 @@ check_minifier() {
     fi
 }
 
-# Minify a single Python file
+# Enhanced minify function that safely removes comments and docstrings
 minify_file() {
     local input_file="$1"
     local temp_file="${input_file}.tmp"
+    local preprocessed_file="${input_file}.prep"
 
     if [[ ! -f "$input_file" ]]; then
         log_warning "File not found: $input_file"
@@ -72,23 +73,124 @@ minify_file() {
     # Calculate original size
     local original_size=$(stat -f%z "$input_file" 2>/dev/null || stat -c%s "$input_file" 2>/dev/null || echo "0")
 
-    # Minify the file with f-string safe settings
-    # Remove only unnecessary whitespace and preserve ALL strings (including f-strings)
-    python3 -m python_minifier \
-        --no-combine-imports \
-        --no-remove-annotations \
-        --no-hoist-literals \
-        --no-rename-locals \
-        --no-constant-folding \
-        --no-remove-builtin-exception-brackets \
-        --no-convert-posargs-to-args \
-        --output "$temp_file" \
-        "$input_file"
+    # Step 1: Check if file contains f-strings
+    local has_fstrings=false
+    if grep -q "f[\"']" "$input_file" || grep -q 'f"""' "$input_file" || grep -q "f'''" "$input_file"; then
+        has_fstrings=true
+        log_info "  Detected f-strings, using enhanced safe mode"
+    fi
 
-    if [ $? -eq 0 ] && [ -s "$temp_file" ]; then
-        # Validate syntax of minified file before using it
+    # Step 2: Pre-process to remove comments and docstrings safely
+    python3 -c "
+import re
+import sys
+
+def safe_remove_docs_and_comments(source):
+    '''Safely remove comments and docstrings while preserving f-strings'''
+    lines = source.split('\n')
+    result_lines = []
+
+    for line in lines:
+        stripped = line.strip()
+
+        # Remove full-line comments
+        if stripped.startswith('#'):
+            result_lines.append('')
+            continue
+
+        # Remove standalone docstrings (simple heuristic)
+        if (stripped.startswith('\"\"\"') and stripped.endswith('\"\"\"') and len(stripped) > 6) or \
+           (stripped.startswith(\"'''\") and stripped.endswith(\"'''\") and len(stripped) > 6):
+            result_lines.append('')
+            continue
+
+        # Remove inline comments while preserving f-strings
+        if '#' in line:
+            # Simple approach: find # that's not inside quotes
+            in_quotes = False
+            quote_char = None
+            comment_pos = -1
+
+            i = 0
+            while i < len(line):
+                char = line[i]
+
+                if not in_quotes:
+                    if char in ['\"', \"'\"]:
+                        quote_char = char
+                        in_quotes = True
+                    elif char == '#':
+                        comment_pos = i
+                        break
+                else:
+                    if char == quote_char and (i == 0 or line[i-1] != '\\\\'):
+                        in_quotes = False
+                        quote_char = None
+
+                i += 1
+
+            if comment_pos >= 0:
+                line = line[:comment_pos].rstrip()
+
+        result_lines.append(line)
+
+    return '\n'.join(result_lines)
+
+# Read and process file
+try:
+    with open('$input_file', 'r', encoding='utf-8') as f:
+        source = f.read()
+
+    processed = safe_remove_docs_and_comments(source)
+
+    with open('$preprocessed_file', 'w', encoding='utf-8') as f:
+        f.write(processed)
+
+except Exception as e:
+    print(f'Error: {e}', file=sys.stderr)
+    sys.exit(1)
+"
+
+    if [ $? -ne 0 ]; then
+        log_warning "  Pre-processing failed, using original file"
+        cp "$input_file" "$preprocessed_file"
+    fi
+
+    # Step 3: Apply python-minifier with appropriate settings
+    local minifier_success=false
+
+    if [ "$has_fstrings" = true ]; then
+        # Safe mode for f-strings - minimal minification
+        log_info "  Applying f-string safe minification..."
+        python3 -m python_minifier \
+            --no-combine-imports \
+            --no-remove-annotations \
+            --no-hoist-literals \
+            --no-rename-locals \
+            --no-constant-folding \
+            --no-remove-builtin-exception-brackets \
+            --no-convert-posargs-to-args \
+            --output "$temp_file" \
+            "$preprocessed_file" && minifier_success=true
+    else
+        # More aggressive mode for files without f-strings
+        log_info "  Applying aggressive minification..."
+        python3 -m python_minifier \
+            --remove-literal-statements \
+            --no-combine-imports \
+            --no-remove-annotations \
+            --no-hoist-literals \
+            --no-rename-locals \
+            --no-constant-folding \
+            --output "$temp_file" \
+            "$preprocessed_file" && minifier_success=true
+    fi
+
+    # Step 4: Validate and finalize
+    if [ "$minifier_success" = true ] && [ -s "$temp_file" ]; then
+        # Validate syntax of minified file
         if python3 -c "import ast; ast.parse(open('$temp_file').read())" 2>/dev/null; then
-            # Calculate new size
+            # Calculate size reduction
             local new_size=$(stat -f%z "$temp_file" 2>/dev/null || stat -c%s "$temp_file" 2>/dev/null || echo "0")
             local reduction_percent=0
 
@@ -96,19 +198,29 @@ minify_file() {
                 reduction_percent=$(( (original_size - new_size) * 100 / original_size ))
             fi
 
-            # Replace original with minified version
+            # Success - use minified version
             mv "$temp_file" "$input_file"
-            log_success "  Reduced by ${reduction_percent}% (${original_size} → ${new_size} bytes)"
+            log_success "  Enhanced minification: ${reduction_percent}% reduction (${original_size} → ${new_size} bytes)"
         else
-            log_warning "  Minified file has syntax errors, keeping original"
-            rm -f "$temp_file"
-            return 0  # Not a failure, just fallback to original
+            log_warning "  Minified file has syntax errors, using preprocessed version"
+            # Fallback to preprocessed version (comments/docstrings removed, but not minified)
+            local preprocessed_size=$(stat -f%z "$preprocessed_file" 2>/dev/null || stat -c%s "$preprocessed_file" 2>/dev/null || echo "0")
+            local reduction_percent=0
+
+            if [ "$original_size" -gt 0 ]; then
+                reduction_percent=$(( (original_size - preprocessed_size) * 100 / original_size ))
+            fi
+
+            mv "$preprocessed_file" "$input_file"
+            log_info "  Used preprocessed version: ${reduction_percent}% reduction (${original_size} → ${preprocessed_size} bytes)"
         fi
     else
-        log_error "  Failed to minify, keeping original"
-        rm -f "$temp_file"
-        return 1
+        log_error "  Minification failed, keeping original"
+        # Don't modify the original file
     fi
+
+    # Cleanup temporary files
+    rm -f "$temp_file" "$preprocessed_file"
 }
 
 # Minify all Python files in a directory
