@@ -135,6 +135,9 @@ service-account.json
 local_settings.py
 .local/
 
+# Claude Code settings (local only)
+.claude/settings.local.json
+
 # macOS
 .AppleDouble
 .LSOverride

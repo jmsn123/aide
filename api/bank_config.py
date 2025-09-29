@@ -16,7 +16,8 @@ import boto3
 from boto3.dynamodb.conditions import Key
 import logging
 
-# Import base classes through normal import system to ensure consistency
+# Import extractors package and base classes to ensure package is properly loaded
+import extractors
 from extractors.base_extractor import BaseBankExtractor, SecurityError
 
 logger = logging.getLogger(__name__)
@@ -189,12 +190,6 @@ class BankConfigService:
             raise SecurityError(f"Extractor module must be in extractors package: {module_name}")
 
         try:
-            # Ensure the extractors package is imported first
-            if 'extractors' not in sys.modules:
-                logger.debug("Importing extractors package...")
-                import extractors
-                sys.modules['extractors'] = extractors
-
             # Dynamic import with reload capability for hot updates
             if module_name in sys.modules:
                 logger.debug(f"Reloading existing module: {module_name}")
