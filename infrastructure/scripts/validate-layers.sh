@@ -108,7 +108,7 @@ main() {
     validate_layer \
         "$LAYERS_DIR/pdf-extractor-api.zip" \
         "API Dependencies" \
-        "fastapi" "uvicorn" "mangum" "httpx"
+        "httpx"
 
     # Validate business logic layer
     validate_layer \

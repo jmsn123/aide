@@ -5,14 +5,19 @@ Provides database-driven, high-performance bank extractor management
 """
 
 import importlib
+import importlib.util
 import sys
 import time
 import os
 from typing import Dict, List, Optional, Type
 from functools import lru_cache
+from pathlib import Path
 import boto3
 from boto3.dynamodb.conditions import Key
 import logging
+
+# Import extractors package and base classes to ensure package is properly loaded
+import extractors
 from extractors.base_extractor import BaseBankExtractor, SecurityError
 
 logger = logging.getLogger(__name__)
