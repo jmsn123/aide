@@ -108,13 +108,21 @@ class AxisBankExtractor(BaseBankExtractor):
                 # Step 3: Calculate financial summary (no balance math needed - data is already correct)
                 financial_summary = self._calculate_financial_summary_optimized()
 
-                # Prepare final result
+                # Prepare final result with processed timestamp
                 result = {
-                    **self.statement_metadata,
-                    'transactions': self.transactions,
-                    'total_transactions': len(self.transactions),
-                    'financial_summary': financial_summary,
-                    'extraction_metadata': self.get_extraction_metadata()
+                    "total_transactions": len(self.transactions),
+                    "processed_at": datetime.now().isoformat(),
+                    "statement_metadata": {
+                        "bank_name": self._bank_name,
+                        "customer_name": self.statement_metadata.get("customer_name", "Not Found"),
+                        "account_number": self.statement_metadata.get("account_number", "Not Found"),
+                        "account_type": self.statement_metadata.get("account_type", "SAVINGS ACCOUNT"),
+                        "statement_period": self.statement_metadata.get("statement_period", {}),
+                        "currency": "INR"
+                    },
+                    "financial_summary": financial_summary,
+                    "transactions": self.transactions,
+                    "extractor_metadata": self.get_extraction_metadata()
                 }
 
                 logger.info("Axis Bank extraction completed: %d transactions, Balance verified: %s",
