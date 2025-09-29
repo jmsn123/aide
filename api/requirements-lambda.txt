@@ -1,7 +1,4 @@
 # Core dependencies for Lambda deployment
-fastapi==0.116.1
-uvicorn[standard]==0.35.0
-mangum==0.18.0
 
 # AWS SDK
 boto3==1.35.0
