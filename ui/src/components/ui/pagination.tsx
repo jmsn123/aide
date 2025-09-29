@@ -179,25 +179,7 @@ const SmartPagination = ({ currentPage, totalPages, onPageChange, className }: P
 
   const visiblePages = getVisiblePages()
 
-  // Keyboard navigation
-  React.useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.target && (event.target as Element).tagName === 'INPUT') {
-        return // Don't handle keyboard events when focus is on input
-      }
-
-      if (event.key === 'ArrowLeft' && currentPage > 1) {
-        event.preventDefault()
-        onPageChange(currentPage - 1)
-      } else if (event.key === 'ArrowRight' && currentPage < totalPages) {
-        event.preventDefault()
-        onPageChange(currentPage + 1)
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentPage, totalPages, onPageChange])
+  // Note: Keyboard navigation is now handled in the usePagination hook
 
   return (
     <Pagination className={className}>
