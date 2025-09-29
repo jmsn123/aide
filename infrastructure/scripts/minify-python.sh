@@ -236,17 +236,9 @@ minify_directory() {
 
     local file_count=0
     local success_count=0
-    local excluded_count=0
 
-    # Find all Python files and minify them (excluding axis extractor)
+    # Find all Python files and minify them
     while IFS= read -r -d '' file; do
-        # Check if file should be excluded
-        if [[ "$file" == *"axis_bank_extractor.py" ]] || [[ "$file" == *"sbi_bank_extractor.py" ]]; then
-            log_warning "Excluding from minification: $(basename "$file")"
-            ((excluded_count++))
-            continue
-        fi
-
         ((file_count++))
         if minify_file "$file"; then
             ((success_count++))
@@ -257,9 +249,6 @@ minify_directory() {
         log_warning "No Python files found in $target_dir"
     else
         log_success "Minified $success_count/$file_count Python files in $(basename "$target_dir")"
-        if [ "$excluded_count" -gt 0 ]; then
-            log_info "Excluded $excluded_count files from minification"
-        fi
     fi
 }
 
