@@ -11,7 +11,7 @@ import { SmartPagination } from './components/ui/pagination'
 import { PaginationInfo } from './components/PaginationInfo'
 import { PaginationErrorBoundary } from './components/PaginationErrorBoundary'
 import { usePagination } from './hooks/usePagination'
-import { FileText, Building, Upload, Shield, AlertCircle, Clock, Info, Eye, Download, Loader2 } from 'lucide-react'
+import { FileText, Building, Upload, Shield, AlertCircle, Clock, Info, Eye, Download, Loader2, RefreshCw } from 'lucide-react'
 import { apiService, ApiError } from './services/api'
 import type { BankStatement } from './services/api'
 
@@ -25,6 +25,7 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [downloadingExcel, setDownloadingExcel] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
 
   // Pagination using custom hook
   const pagination = usePagination(bankStatements, {
@@ -37,9 +38,13 @@ function App() {
     // No-op for simplified header
   }
 
-  const fetchBankStatements = async () => {
+  const fetchBankStatements = async (isRefresh = false) => {
     try {
-      setLoading(true)
+      if (isRefresh) {
+        setRefreshing(true)
+      } else {
+        setLoading(true)
+      }
       setError(null)
 
       const statements = await apiService.fetchStatements()
@@ -53,8 +58,16 @@ function App() {
       setError(errorMessage)
       setBankStatements([])
     } finally {
-      setLoading(false)
+      if (isRefresh) {
+        setRefreshing(false)
+      } else {
+        setLoading(false)
+      }
     }
+  }
+
+  const handleRefresh = async () => {
+    await fetchBankStatements(true)
   }
 
   // Fetch data on component mount
@@ -243,27 +256,42 @@ function App() {
               <h1 className="text-3xl font-bold text-foreground mb-2">Bank Statements</h1>
               <p className="text-muted-foreground">Manage and view processed bank statement documents</p>
             </div>
-            
-            {/* Upload Button */}
-            <Button 
-              onClick={() => setIsUploadModalOpen(true)}
-              className="flex items-center gap-2"
-              size="lg"
-            >
-              <Upload className="w-5 h-5" />
-              Upload Bank Statement
-            </Button>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleRefresh}
+                variant="outline"
+                className="flex items-center gap-2"
+                size="lg"
+                disabled={refreshing}
+                title="Refresh statements list"
+                aria-label="Refresh bank statements list"
+                aria-busy={refreshing}
+              >
+                <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              <Button
+                onClick={() => setIsUploadModalOpen(true)}
+                className="flex items-center gap-2"
+                size="lg"
+              >
+                <Upload className="w-5 h-5" />
+                Upload Bank Statement
+              </Button>
+            </div>
           </div>
 
           {/* Error State */}
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
               <p className="text-red-700">Error: {error}</p>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 className="mt-2"
-                onClick={fetchBankStatements}
+                onClick={() => fetchBankStatements()}
               >
                 Retry
               </Button>
@@ -320,7 +348,7 @@ function App() {
                   <TableHead className="w-[20%]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody className={`transition-opacity duration-300 ${pagination.isPageChanging ? 'opacity-50' : 'opacity-100'}`}>
+              <TableBody className={`transition-opacity duration-300 ${pagination.isPageChanging || refreshing ? 'opacity-70' : 'opacity-100'}`}>
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8">
