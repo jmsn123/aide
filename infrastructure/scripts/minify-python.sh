@@ -239,7 +239,16 @@ minify_directory() {
     local success_count=0
 
     # Find all Python files and minify them
+    # Skip files with known f-string nested quote issues
     while IFS= read -r -d '' file; do
+        local filename=$(basename "$file")
+
+        # Skip files known to have f-string quote nesting issues
+        if [[ "$filename" == "metadata_extractor.py" ]] || [[ "$filename" == "pdf_utils.py" ]]; then
+            log_warning "Skipping $filename (f-string nested quote handling)"
+            continue
+        fi
+
         ((file_count++))
         if minify_file "$file"; then
             ((success_count++))
