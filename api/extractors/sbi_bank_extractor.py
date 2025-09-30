@@ -19,6 +19,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from decimal import InvalidOperation
+from dateutil import parser as date_parser
 
 # PDF processing library
 try:
@@ -27,6 +28,8 @@ except ImportError:
     raise ImportError("pdfplumber is required for SBI Bank PDF extraction. Install with: pip install pdfplumber")
 
 from .base_extractor import BaseBankExtractor
+from .shared import HybridMetadataExtractor, get_bank_field_config, get_bank_regions
+from .shared.pdf_utils import preprocess_pdf_text
 
 logger = logging.getLogger(__name__)
 
@@ -43,19 +46,15 @@ class SBIBankExtractor(BaseBankExtractor):
     - Account metadata extraction from header sections
     """
 
-    # Compiled regex patterns for metadata extraction
-    ACCOUNT_PATTERN = re.compile(r'Account\s*Number\s*[:\-]?\s*(\d+)')
-    CUSTOMER_PATTERN = re.compile(r'^([A-Z\s]+)$', re.MULTILINE)
-    IFSC_PATTERN = re.compile(r'IFSC\s*[:\-]?\s*([A-Z0-9]+)')
-    MICR_PATTERN = re.compile(r'MICR\s*[:\-]?\s*(\d+)')
-    CIF_PATTERN = re.compile(r'CIF\s*No\.?\s*[:\-]?\s*(\d+)')
-    BRANCH_PATTERN = re.compile(r'Branch\s*[:\-]?\s*([A-Z\s\(\)]+)')
-    ADDRESS_PATTERN = re.compile(r'Address\s*[:\-]?\s*([^\n]+)')
-    EMAIL_PATTERN = re.compile(r'Email\s*[:\-]?\s*([^\s]+@[^\s]+)')
-    PHONE_PATTERN = re.compile(r'Mobile\s*[:\-]?\s*([\d\-\+\s]+)')
+    # ============================================================================
+    # CONFIGURATION (Uses Shared Enterprise Extraction System)
+    # ============================================================================
+    # Note: Field configurations and regions are now managed by the shared module
+    # at api/extractors/shared/field_configs.py
+    # This eliminates code duplication and provides consistent extraction across banks
 
-    # Statement period pattern for DD-MM-YY format
-    PERIOD_PATTERN = re.compile(r'From\s*[:\-]?\s*(\d{2}-\d{2}-\d{2,4})\s*To\s*[:\-]?\s*(\d{2}-\d{2}-\d{2,4})')
+    # Statement period pattern - case insensitive, flexible date format
+    PERIOD_PATTERN = re.compile(r'(?i)from\s+(.+?)\s+to\s+(.+?)(?:\s|$)', re.IGNORECASE)
 
     # Balance patterns for DR/CR notation
     BALANCE_DR_CR_PATTERN = re.compile(r'(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\s*(DR|CR)')
@@ -86,6 +85,9 @@ class SBIBankExtractor(BaseBankExtractor):
         self.transactions = []
         self.statement_metadata = {}
 
+        # Initialize shared hybrid metadata extractor
+        self.metadata_extractor = HybridMetadataExtractor('sbi')
+
         # Performance optimization: Cache for extracted data
         self._page_text_cache = {}
         self._tables_cache = {}
@@ -99,23 +101,92 @@ class SBIBankExtractor(BaseBankExtractor):
     def get_supported_capabilities(self) -> List[str]:
         return self._capabilities
 
+    # ============================================================================
+    # NOTE: Enterprise extraction methods have been moved to shared module
+    # ============================================================================
+    # The following methods are now available from the shared module:
+    # - preprocess_pdf_text() -> from .shared.pdf_utils import preprocess_pdf_text
+    # - extract_from_region() -> from .shared.pdf_utils import extract_from_region
+    # - extract_field_hybrid() -> HybridMetadataExtractor.extract_field()
+    #
+    # This eliminates code duplication and provides consistent extraction
+    # across all bank extractors. See api/extractors/shared/ for implementation.
+
     def extract_complete_statement(self, pdf_path: str, password: Optional[str] = None) -> Dict:
         """
-        Extract complete statement data optimized for SBI Bank's format
+        Extract complete statement data optimized for SBI Bank's format.
+
+        IMPORTANT: Transactions are always extracted even if metadata extraction fails.
+        Extraction errors are captured and returned for database storage.
         """
+        extraction_errors = []
+
         try:
             # Open PDF with pdfplumber (handles password automatically)
             with pdfplumber.open(pdf_path, password=password) as pdf:
                 logger.info("Processing SBI Bank statement with %d pages", len(pdf.pages))
 
                 # Step 1: Extract metadata from header sections
-                self.statement_metadata = self._extract_metadata_sbi(pdf)
+                # CRITICAL: Wrap in try-except to ensure transactions are still extracted if metadata fails
+                try:
+                    self.statement_metadata, metadata_errors = self._extract_metadata_sbi(pdf)
+                    if metadata_errors:
+                        extraction_errors.extend(metadata_errors)
+                        logger.warning("Metadata extraction had %d errors", len(metadata_errors))
+                except Exception as e:
+                    error_msg = f"Metadata extraction failed completely: {str(e)}"
+                    logger.error(error_msg)
+                    extraction_errors.append({
+                        "stage": "metadata",
+                        "error_type": "complete_failure",
+                        "error_message": error_msg,
+                        "timestamp": datetime.now().isoformat()
+                    })
+                    # Initialize with defaults so processing can continue
+                    self.statement_metadata = {
+                        "customer_name": "Not Found",
+                        "account_number": "Not Found",
+                        "account_type": "SAVINGS ACCOUNT",
+                        "statement_period": {"from_date": "Not Found", "to_date": "Not Found"}
+                    }
 
                 # Step 2: Extract transactions with multi-line handling
-                self.transactions = self._extract_transactions_sbi(pdf)
+                # CRITICAL: Always attempt transaction extraction regardless of metadata status
+                try:
+                    self.transactions = self._extract_transactions_sbi(pdf)
+                    logger.info("Successfully extracted %d transactions", len(self.transactions))
+                except Exception as e:
+                    error_msg = f"Transaction extraction failed: {str(e)}"
+                    logger.error(error_msg)
+                    extraction_errors.append({
+                        "stage": "transactions",
+                        "error_type": "complete_failure",
+                        "error_message": error_msg,
+                        "timestamp": datetime.now().isoformat()
+                    })
+                    self.transactions = []
 
                 # Step 3: Calculate financial summary with DR/CR handling
-                financial_summary = self._calculate_financial_summary_sbi()
+                try:
+                    financial_summary = self._calculate_financial_summary_sbi()
+                except Exception as e:
+                    error_msg = f"Financial summary calculation failed: {str(e)}"
+                    logger.error(error_msg)
+                    extraction_errors.append({
+                        "stage": "financial_summary",
+                        "error_type": "calculation_failure",
+                        "error_message": error_msg,
+                        "timestamp": datetime.now().isoformat()
+                    })
+                    financial_summary = {
+                        'opening_balance': 0.0,
+                        'closing_balance': 0.0,
+                        'total_credits': 0.0,
+                        'total_debits': 0.0,
+                        'net_change': 0.0,
+                        'transaction_count': len(self.transactions),
+                        'balance_verified': False
+                    }
 
                 # Step 4: Determine statement period from transactions if not found in metadata
                 if (self.statement_metadata.get("statement_period", {}).get("from_date") == "Not Found" and
@@ -129,111 +200,260 @@ class SBIBankExtractor(BaseBankExtractor):
                         }
 
                 # Prepare final result with processed timestamp
+                # Include all extracted metadata fields dynamically
+                statement_meta = {
+                    "bank_name": self._bank_name,
+                    "customer_name": self.statement_metadata.get("customer_name", "Not Found"),
+                    "account_number": self.statement_metadata.get("account_number", "Not Found"),
+                    "account_type": self.statement_metadata.get("account_type", "SAVINGS ACCOUNT"),
+                    "statement_period": self.statement_metadata.get("statement_period", {}),
+                    "currency": "INR"
+                }
+
+                # Add optional metadata fields if they exist
+                optional_fields = ['ifsc_code', 'micr_code', 'cif_number', 'branch_name',
+                                 'customer_email', 'customer_phone', 'opening_balance']
+                for field in optional_fields:
+                    if field in self.statement_metadata:
+                        statement_meta[field] = self.statement_metadata[field]
+
                 result = {
                     "total_transactions": len(self.transactions),
                     "processed_at": datetime.now().isoformat(),
-                    "statement_metadata": {
-                        "bank_name": self._bank_name,
-                        "customer_name": self.statement_metadata.get("customer_name", "Not Found"),
-                        "account_number": self.statement_metadata.get("account_number", "Not Found"),
-                        "account_type": self.statement_metadata.get("account_type", "SAVINGS ACCOUNT"),
-                        "statement_period": self.statement_metadata.get("statement_period", {}),
-                        "currency": "INR"
-                    },
+                    "statement_metadata": statement_meta,
                     "financial_summary": financial_summary,
                     "transactions": self.transactions,
-                    "extractor_metadata": self.get_extraction_metadata()
+                    "extractor_metadata": self.get_extraction_metadata(),
+                    "extraction_errors": extraction_errors,  # NEW: For database storage
+                    "extraction_status": "partial" if extraction_errors else "complete"  # NEW: Overall status
                 }
 
-                logger.info("SBI Bank extraction completed: %d transactions, Balance verified: %s",
-                          len(self.transactions), financial_summary.get("balance_verified", False))
+                if extraction_errors:
+                    logger.warning("SBI Bank extraction completed WITH ERRORS: %d transactions, %d errors",
+                                 len(self.transactions), len(extraction_errors))
+                else:
+                    logger.info("SBI Bank extraction completed successfully: %d transactions, Balance verified: %s",
+                              len(self.transactions), financial_summary.get("balance_verified", False))
 
                 return result
 
         except Exception as e:
-            logger.error("Error extracting SBI Bank statement from %s: %s", pdf_path, e)
-            raise
+            # Critical failure - PDF couldn't be opened or processed at all
+            error_msg = f"Critical failure extracting SBI Bank statement from {pdf_path}: {str(e)}"
+            logger.error(error_msg)
+
+            # Return partial result with error information for database storage
+            return {
+                "total_transactions": 0,
+                "processed_at": datetime.now().isoformat(),
+                "statement_metadata": {
+                    "bank_name": self._bank_name,
+                    "customer_name": "Not Found",
+                    "account_number": "Not Found",
+                    "account_type": "SAVINGS ACCOUNT",
+                    "statement_period": {"from_date": "Not Found", "to_date": "Not Found"},
+                    "currency": "INR"
+                },
+                "financial_summary": {
+                    'opening_balance': 0.0,
+                    'closing_balance': 0.0,
+                    'total_credits': 0.0,
+                    'total_debits': 0.0,
+                    'net_change': 0.0,
+                    'transaction_count': 0,
+                    'balance_verified': False
+                },
+                "transactions": [],
+                "extractor_metadata": self.get_extraction_metadata(),
+                "extraction_errors": [{
+                    "stage": "critical",
+                    "error_type": "pdf_processing_failure",
+                    "error_message": error_msg,
+                    "timestamp": datetime.now().isoformat()
+                }],
+                "extraction_status": "failed"
+            }
         finally:
             # Clear caches to free memory
             self._clear_cache()
 
-    def _extract_metadata_sbi(self, pdf) -> Dict:
-        """Extract metadata specific to SBI Bank format"""
+    def _extract_metadata_sbi(self, pdf) -> Tuple[Dict, List[Dict]]:
+        """
+        Extract metadata specific to SBI Bank format using hybrid extraction.
+
+        Uses enterprise-grade field mapping configuration and hybrid extraction
+        methods (key-value, position-based, region scan) with automatic fallback.
+
+        Returns:
+            Tuple of (metadata_dict, errors_list) where errors_list contains details
+            about any fields that failed to extract
+        """
         metadata = {
             "customer_name": "Not Found",
             "account_number": "Not Found",
             "account_type": "SAVINGS ACCOUNT",
             "statement_period": {"from_date": "Not Found", "to_date": "Not Found"}
         }
+        errors = []
 
         try:
-            # Extract text from first 2 pages for metadata
+            # Get first page for metadata extraction
+            if not pdf.pages:
+                error_msg = "PDF has no pages"
+                logger.error(error_msg)
+                errors.append({
+                    "field": "all",
+                    "error_type": "no_pages",
+                    "error_message": error_msg,
+                    "timestamp": datetime.now().isoformat()
+                })
+                return metadata, errors
+
+            # ====================================================================
+            # USE SHARED HYBRID METADATA EXTRACTOR FOR STANDARD FIELDS
+            # ====================================================================
+            # Extract all standard metadata fields (account number, IFSC, MICR, CIF, etc.)
+            try:
+                extracted_fields = self.metadata_extractor.extract_all_metadata(pdf)
+            except Exception as e:
+                error_msg = f"Shared metadata extractor failed: {str(e)}"
+                logger.error(error_msg)
+                errors.append({
+                    "field": "shared_extractor",
+                    "error_type": "extractor_failure",
+                    "error_message": error_msg,
+                    "timestamp": datetime.now().isoformat()
+                })
+                extracted_fields = {}
+
+            # Map extracted fields to metadata structure and track missing required fields
+            required_fields = {
+                'account_number': 'Account number is required for statement processing',
+                'ifsc_code': 'IFSC code is required for bank identification'
+            }
+
+            if extracted_fields.get('account_number'):
+                metadata["account_number"] = extracted_fields['account_number']
+            elif 'account_number' in required_fields:
+                errors.append({
+                    "field": "account_number",
+                    "error_type": "missing_required_field",
+                    "error_message": required_fields['account_number'],
+                    "timestamp": datetime.now().isoformat()
+                })
+
+            if extracted_fields.get('ifsc_code'):
+                metadata["ifsc_code"] = extracted_fields['ifsc_code']
+            elif 'ifsc_code' in required_fields:
+                errors.append({
+                    "field": "ifsc_code",
+                    "error_type": "missing_required_field",
+                    "error_message": required_fields['ifsc_code'],
+                    "timestamp": datetime.now().isoformat()
+                })
+
+            # Optional fields - don't generate errors if missing
+            if extracted_fields.get('micr_code'):
+                metadata["micr_code"] = extracted_fields['micr_code']
+            if extracted_fields.get('cif_number'):
+                metadata["cif_number"] = extracted_fields['cif_number']
+            if extracted_fields.get('branch'):
+                metadata["branch_name"] = extracted_fields['branch'].strip()
+            if extracted_fields.get('email'):
+                metadata["customer_email"] = extracted_fields['email']
+            if extracted_fields.get('phone'):
+                metadata["customer_phone"] = extracted_fields['phone'].strip()
+
+            # ====================================================================
+            # SPECIAL HANDLING FOR FIELDS WITH CUSTOM LOGIC
+            # ====================================================================
+
+            # Extract text from first 2 pages for special fields
             first_page_text = self._safe_extract_page_text(pdf, 0)
             second_page_text = self._safe_extract_page_text(pdf, 1) if len(pdf.pages) > 1 else ""
             header_text = first_page_text + "\n" + second_page_text
 
-            if not header_text.strip():
-                logger.error("No text extracted from PDF header pages")
-                return metadata
+            # Preprocess header text using shared utility
+            header_text = preprocess_pdf_text(header_text)
 
-            # Extract customer name - typically at the top of the first page
-            customer_name = self._extract_customer_name_sbi(first_page_text)
-            if customer_name:
-                metadata["customer_name"] = customer_name
+            # Extract customer name - prioritize custom SBI logic, fallback to shared extractor
+            # Custom logic handles SBI-specific format where name appears before "Customer Name:" label
+            try:
+                customer_name = self._extract_customer_name_sbi(first_page_text)
+                if customer_name:
+                    metadata["customer_name"] = customer_name
+                elif extracted_fields.get('customer_name'):
+                    # Fallback: Use shared extractor result (handles "Account Name" field)
+                    metadata["customer_name"] = extracted_fields['customer_name'].strip()
+                else:
+                    # Customer name not found - log warning but don't fail
+                    logger.warning("Customer name could not be extracted")
+            except Exception as e:
+                error_msg = f"Customer name extraction failed: {str(e)}"
+                logger.warning(error_msg)
+                errors.append({
+                    "field": "customer_name",
+                    "error_type": "extraction_failure",
+                    "error_message": error_msg,
+                    "timestamp": datetime.now().isoformat()
+                })
 
-            # Extract account number
-            account_match = self.ACCOUNT_PATTERN.search(header_text)
-            if account_match:
-                metadata["account_number"] = account_match.group(1)
+            # Extract statement period - requires date normalization
+            try:
+                period_match = self.PERIOD_PATTERN.search(header_text)
+                if period_match:
+                    from_date_str = period_match.group(1).strip()
+                    to_date_str = period_match.group(2).strip()
 
-            # Extract statement period with DD-MM-YY format handling
-            period_match = self.PERIOD_PATTERN.search(header_text)
-            if period_match:
-                from_date = self._normalize_date_format(period_match.group(1))
-                to_date = self._normalize_date_format(period_match.group(2))
-                metadata["statement_period"] = {
-                    "from_date": from_date,
-                    "to_date": to_date
-                }
+                    # Normalize dates to DD-MM-YYYY format
+                    from_date = self._normalize_date_format(from_date_str)
+                    to_date = self._normalize_date_format(to_date_str)
 
-            # Extract additional metadata
-            ifsc_match = self.IFSC_PATTERN.search(header_text)
-            if ifsc_match:
-                metadata["ifsc_code"] = ifsc_match.group(1)
+                    metadata["statement_period"] = {
+                        "from_date": from_date,
+                        "to_date": to_date
+                    }
+            except Exception as e:
+                error_msg = f"Statement period extraction failed: {str(e)}"
+                logger.warning(error_msg)
+                errors.append({
+                    "field": "statement_period",
+                    "error_type": "extraction_failure",
+                    "error_message": error_msg,
+                    "timestamp": datetime.now().isoformat()
+                })
 
-            micr_match = self.MICR_PATTERN.search(header_text)
-            if micr_match:
-                metadata["micr_code"] = micr_match.group(1)
+            # Extract opening balance - requires DR/CR handling
+            try:
+                opening_match = self.OPENING_BALANCE_PATTERN.search(header_text)
+                if opening_match:
+                    amount = float(opening_match.group(1).replace(',', ''))
+                    dr_cr = opening_match.group(2) if opening_match.group(2) else 'CR'
+                    metadata["opening_balance"] = amount if dr_cr == 'CR' else -amount
+            except Exception as e:
+                error_msg = f"Opening balance extraction failed: {str(e)}"
+                logger.warning(error_msg)
+                errors.append({
+                    "field": "opening_balance",
+                    "error_type": "extraction_failure",
+                    "error_message": error_msg,
+                    "timestamp": datetime.now().isoformat()
+                })
 
-            cif_match = self.CIF_PATTERN.search(header_text)
-            if cif_match:
-                metadata["cif_number"] = cif_match.group(1)
-
-            branch_match = self.BRANCH_PATTERN.search(header_text)
-            if branch_match:
-                metadata["branch_name"] = branch_match.group(1).strip()
-
-            email_match = self.EMAIL_PATTERN.search(header_text)
-            if email_match:
-                metadata["customer_email"] = email_match.group(1)
-
-            phone_match = self.PHONE_PATTERN.search(header_text)
-            if phone_match:
-                metadata["customer_phone"] = phone_match.group(1).strip()
-
-            # Extract opening balance with DR/CR handling
-            opening_match = self.OPENING_BALANCE_PATTERN.search(header_text)
-            if opening_match:
-                amount = float(opening_match.group(1).replace(',', ''))
-                dr_cr = opening_match.group(2) if opening_match.group(2) else 'CR'
-                metadata["opening_balance"] = amount if dr_cr == 'CR' else -amount
-
-            logger.info("Extracted SBI Bank metadata for account: %s", metadata.get('account_number', 'Unknown'))
+            logger.info("Extracted SBI Bank metadata for account: %s (with %d errors)",
+                       metadata.get('account_number', 'Unknown'), len(errors))
 
         except Exception as e:
-            logger.error("Error extracting SBI Bank metadata: %s", e)
+            error_msg = f"Unexpected error in metadata extraction: {str(e)}"
+            logger.error(error_msg)
+            errors.append({
+                "field": "metadata_extraction",
+                "error_type": "unexpected_error",
+                "error_message": error_msg,
+                "timestamp": datetime.now().isoformat()
+            })
 
-        return metadata
+        return metadata, errors
 
     def _extract_customer_name_sbi(self, page_text: str) -> Optional[str]:
         """Extract customer name from SBI format - typically after 'STATEMENT OF ACCOUNT'"""
@@ -266,20 +486,24 @@ class SBIBankExtractor(BaseBankExtractor):
         return None
 
     def _normalize_date_format(self, date_str: str) -> str:
-        """Convert DD-MM-YY to DD-MM-YYYY format"""
+        """
+        Convert any valid date to standard DD-MM-YYYY format.
+        Handles: DD-MM-YY, DD-MM-YYYY, DD Mon YYYY, DD/MM/YY, DD/MM/YYYY
+        """
         try:
-            # Handle both YY and YYYY formats
-            if re.match(r'\d{2}-\d{2}-\d{2}$', date_str):
-                # Convert YY to YYYY (assume 20XX for years 00-50, 19XX for 51-99)
-                day, month, year = date_str.split('-')
-                year_int = int(year)
-                if year_int <= 50:
-                    full_year = "20" + year
-                else:
-                    full_year = "19" + year
-                return "%s-%s-%s" % (day, month, full_year)
-            return date_str
-        except Exception:
+            if not date_str or not date_str.strip():
+                return date_str
+
+            # Clean whitespace and newlines
+            cleaned = ' '.join(date_str.split())
+
+            # Parse date using dateutil
+            parsed_date = date_parser.parse(cleaned, dayfirst=True)
+
+            # Return in DD-MM-YYYY format
+            return parsed_date.strftime('%d-%m-%Y')
+        except (ValueError, date_parser.ParserError, OverflowError):
+            # If parsing fails, return original string
             return date_str
 
     def _extract_transactions_sbi(self, pdf) -> List[Dict]:
@@ -536,16 +760,26 @@ class SBIBankExtractor(BaseBankExtractor):
             return None, 1
 
     def _is_valid_sbi_date(self, date_str: str) -> bool:
-        """Check if string is a valid SBI date (DD-MM-YY or DD-MM-YYYY)"""
+        """
+        Check if string is a valid SBI date using advanced date parsing.
+        Supports: DD-MM-YY, DD-MM-YYYY, DD Mon YYYY, DD/MM/YY, DD/MM/YYYY
+        """
+        if not date_str or not date_str.strip():
+            return False
+
         try:
-            # Try DD-MM-YY format first
-            if re.match(r'^\d{2}-\d{2}-\d{2}$', date_str):
-                return True
-            # Try DD-MM-YYYY format
-            if re.match(r'^\d{2}-\d{2}-\d{4}$', date_str):
+            # Clean whitespace and newlines (e.g., "31 Mar\n2025" -> "31 Mar 2025")
+            cleaned = ' '.join(date_str.split())
+
+            # Parse date - handles multiple formats automatically
+            # dayfirst=True ensures DD-MM-YYYY interpretation
+            parsed_date = date_parser.parse(cleaned, dayfirst=True)
+
+            # Validate reasonable date range for bank statements (1970-2100)
+            if 1970 <= parsed_date.year <= 2100:
                 return True
             return False
-        except Exception:
+        except (ValueError, date_parser.ParserError, OverflowError):
             return False
 
     def _is_amount(self, text: str) -> bool:
