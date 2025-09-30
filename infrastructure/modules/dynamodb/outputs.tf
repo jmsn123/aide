@@ -36,6 +36,15 @@ output "bank_configurations_table" {
   }
 }
 
+output "users_table" {
+  description = "DynamoDB users table"
+  value = {
+    name = aws_dynamodb_table.users.name
+    arn  = aws_dynamodb_table.users.arn
+    id   = aws_dynamodb_table.users.id
+  }
+}
+
 output "table_arns" {
   description = "List of all DynamoDB table ARNs"
   value = [
@@ -43,6 +52,7 @@ output "table_arns" {
     aws_dynamodb_table.transactions.arn,
     aws_dynamodb_table.usage.arn,
     aws_dynamodb_table.bank_configurations.arn,
+    aws_dynamodb_table.users.arn,
   ]
 }
 
@@ -51,7 +61,8 @@ output "table_names" {
   value = {
     jobs                 = aws_dynamodb_table.jobs.name
     transactions         = aws_dynamodb_table.transactions.name
-    usage               = aws_dynamodb_table.usage.name
-    bank_configurations = aws_dynamodb_table.bank_configurations.name
+    usage                = aws_dynamodb_table.usage.name
+    bank_configurations  = aws_dynamodb_table.bank_configurations.name
+    users                = aws_dynamodb_table.users.name
   }
 }

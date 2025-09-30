@@ -58,6 +58,7 @@ output "dynamodb_tables" {
     transactions         = module.dynamodb.transactions_table
     usage                = module.dynamodb.usage_table
     bank_configurations  = module.dynamodb.bank_configurations_table
+    users                = module.dynamodb.users_table
   }
 }
 

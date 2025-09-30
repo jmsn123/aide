@@ -111,12 +111,12 @@ resource "aws_dynamodb_table" "usage" {
   billing_mode   = "PAY_PER_REQUEST"
   hash_key       = "user_id"
   range_key      = "time_window"
-  
+
   attribute {
     name = "user_id"
     type = "S"
   }
-  
+
   attribute {
     name = "time_window"
     type = "S"
@@ -138,3 +138,68 @@ resource "aws_dynamodb_table" "usage" {
     Type = "DynamoDB"
   })
 }
+
+# Users table - stores user account information and metadata
+resource "aws_dynamodb_table" "users" {
+  name           = "${var.name_prefix}-users"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "user_id"
+
+  # Attributes
+  attribute {
+    name = "user_id"
+    type = "S"  # Cognito sub (UUID)
+  }
+
+  attribute {
+    name = "email"
+    type = "S"
+  }
+
+  attribute {
+    name = "created_at"
+    type = "S"  # ISO 8601 timestamp
+  }
+
+  # GSI for querying users by email (for lookups during login/signup)
+  global_secondary_index {
+    name            = "email-index"
+    hash_key        = "email"
+    projection_type = "ALL"
+  }
+
+  # GSI for querying users by creation date (for analytics/admin)
+  global_secondary_index {
+    name            = "created-at-index"
+    hash_key        = "created_at"
+    projection_type = "ALL"
+  }
+
+  # Enable point-in-time recovery for data protection
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  # No TTL - user accounts are permanent unless explicitly deleted
+  # Users table should persist indefinitely for account management
+
+  tags = merge(var.tags, {
+    Name = "${var.name_prefix}-users"
+    Type = "DynamoDB"
+    Purpose = "UserAccounts"
+  })
+}
+
+# User attributes stored in the table (not defined as DynamoDB attributes):
+# - user_id (partition key): Cognito sub UUID
+# - email (GSI): User's email address
+# - cognito_username: Cognito username (may differ from email)
+# - name: User's display name
+# - plan_type: Subscription plan (free, pro, enterprise)
+# - created_at (GSI): Account creation timestamp
+# - updated_at: Last profile update timestamp
+# - last_login: Last successful login timestamp
+# - email_verified: Boolean, synced from Cognito
+# - is_active: Boolean, account status
+# - usage_limits: JSON with rate limits per plan
+# - metadata: JSON with additional user data
