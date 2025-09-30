@@ -1,21 +1,21 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Header } from './components/Header'
-import { Footer } from './components/Footer'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './components/ui/table'
-import { Badge } from './components/ui/badge'
-import { Button } from './components/ui/button'
-import { FileUploadModal } from './components/FileUploadModal'
-import { SuccessDialog } from './components/SuccessDialog'
-import { SmartPagination } from './components/ui/pagination'
-import { PaginationInfo } from './components/PaginationInfo'
-import { PaginationErrorBoundary } from './components/PaginationErrorBoundary'
-import { usePagination } from './hooks/usePagination'
+import { Header } from '../components/Header'
+import { Footer } from '../components/Footer'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
+import { Badge } from '../components/ui/badge'
+import { Button } from '../components/ui/button'
+import { FileUploadModal } from '../components/FileUploadModal'
+import { SuccessDialog } from '../components/SuccessDialog'
+import { SmartPagination } from '../components/ui/pagination'
+import { PaginationInfo } from '../components/PaginationInfo'
+import { PaginationErrorBoundary } from '../components/PaginationErrorBoundary'
+import { usePagination } from '../hooks/usePagination'
 import { FileText, Building, Upload, Shield, AlertCircle, Clock, Info, Eye, Download, Loader2, RefreshCw } from 'lucide-react'
-import { apiService, ApiError } from './services/api'
-import type { BankStatement } from './services/api'
+import { apiService, ApiError } from '../services/api'
+import type { BankStatement } from '../services/api'
 
-function App() {
+function DashboardPage() {
   const navigate = useNavigate()
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
@@ -480,4 +480,4 @@ function App() {
   )
 }
 
-export default App
+export default DashboardPage
