@@ -1,5 +1,26 @@
 # Main Terraform Configuration Outputs
 
+# Cognito User Pool
+output "cognito_user_pool_id" {
+  description = "Cognito User Pool ID"
+  value       = module.cognito.user_pool_id
+}
+
+output "cognito_user_pool_arn" {
+  description = "Cognito User Pool ARN"
+  value       = module.cognito.user_pool_arn
+}
+
+output "cognito_user_pool_endpoint" {
+  description = "Cognito User Pool endpoint"
+  value       = module.cognito.user_pool_endpoint
+}
+
+output "cognito_user_pool_client_id" {
+  description = "Cognito User Pool Client ID for frontend"
+  value       = module.cognito.user_pool_client_id
+}
+
 # API Gateway
 output "api_gateway_url" {
   description = "API Gateway invoke URL"

@@ -62,10 +62,20 @@ locals {
   name_prefix = var.environment
 }
 
-# DynamoDB Module - Created first as IAM needs the ARNs
+# Cognito Module - Created first for user authentication
+module "cognito" {
+  source = "./modules/cognito"
+
+  name_prefix       = local.name_prefix
+  environment       = var.environment
+  auto_confirm_users = var.environment == "dev" ? true : false
+  tags              = local.common_tags
+}
+
+# DynamoDB Module - Created second as IAM needs the ARNs
 module "dynamodb" {
   source = "./modules/dynamodb"
-  
+
   name_prefix = local.name_prefix
   tags        = local.common_tags
 }
