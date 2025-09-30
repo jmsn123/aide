@@ -35,3 +35,8 @@ variable "sqs_queue_arns" {
   description = "List of SQS queue ARNs"
   type        = list(string)
 }
+
+variable "cognito_user_pool_arn" {
+  description = "Cognito User Pool ARN for authentication"
+  type        = string
+}

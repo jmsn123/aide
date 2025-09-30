@@ -67,6 +67,16 @@ variable "excel_export_lambda_name" {
   type        = string
 }
 
+variable "auth_signup_lambda_invoke_arn" {
+  description = "Auth Signup Lambda function invoke ARN"
+  type        = string
+}
+
+variable "auth_signup_lambda_name" {
+  description = "Auth Signup Lambda function name"
+  type        = string
+}
+
 # Lambda function source code hashes for triggering deployments
 variable "lambda_source_code_hashes" {
   description = "Map of Lambda function source code hashes"

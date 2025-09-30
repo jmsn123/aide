@@ -133,8 +133,9 @@ module "iam" {
   dynamodb_table_arns = module.dynamodb.table_arns
   s3_bucket_arn       = module.s3.bucket.arn
   sqs_queue_arns      = module.sqs.queue_arns
+  cognito_user_pool_arn = module.cognito.user_pool_arn
 
-  depends_on = [module.dynamodb, module.s3, module.sqs]
+  depends_on = [module.dynamodb, module.s3, module.sqs, module.cognito]
 }
 
 
@@ -171,9 +172,12 @@ module "lambda" {
     TRANSACTIONS_TABLE           = module.dynamodb.transactions_table.name
     USAGE_TABLE_NAME             = module.dynamodb.usage_table.name
     BANK_CONFIGURATIONS_TABLE    = module.dynamodb.bank_configurations_table.name
+    USERS_TABLE_NAME             = module.dynamodb.users_table.name
     S3_BUCKET_NAME               = module.s3.bucket.id
     PROCESSING_QUEUE_URL         = module.sqs.processing_queue.url
     DLQ_URL                      = module.sqs.dlq.url
+    COGNITO_USER_POOL_ID         = module.cognito.user_pool_id
+    COGNITO_CLIENT_ID            = module.cognito.user_pool_client_id
   }
 
   depends_on = [module.iam, module.s3, module.sqs, module.lambda_layers]
@@ -198,6 +202,8 @@ module "api_gateway" {
   excel_export_lambda_name         = module.lambda.functions.excel_export.name
   pdf_viewer_lambda_invoke_arn     = module.lambda.functions.pdf_viewer.invoke_arn
   pdf_viewer_lambda_name           = module.lambda.functions.pdf_viewer.name
+  auth_signup_lambda_invoke_arn    = module.lambda.functions.auth_signup.invoke_arn
+  auth_signup_lambda_name          = module.lambda.functions.auth_signup.name
 
   # Lambda source code hashes for triggering API Gateway deployment when functions change
   lambda_source_code_hashes = {
@@ -206,6 +212,7 @@ module "api_gateway" {
     statement_data = module.lambda.functions.statement_data.source_code_hash
     excel_export   = module.lambda.functions.excel_export.source_code_hash
     pdf_viewer     = module.lambda.functions.pdf_viewer.source_code_hash
+    auth_signup    = module.lambda.functions.auth_signup.source_code_hash
   }
 
   depends_on = [module.lambda, module.iam]

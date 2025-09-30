@@ -172,6 +172,42 @@ resource "aws_iam_role_policy_attachment" "lambda_cloudwatch" {
   policy_arn = aws_iam_policy.cloudwatch_policy.arn
 }
 
+# Cognito access policy for authentication Lambda functions
+resource "aws_iam_policy" "cognito_policy" {
+  name        = "${var.name_prefix}-cognito-policy"
+  description = "Policy for Lambda to access Cognito User Pools"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:AdminCreateUser",
+          "cognito-idp:AdminSetUserPassword",
+          "cognito-idp:AdminGetUser",
+          "cognito-idp:AdminUpdateUserAttributes",
+          "cognito-idp:AdminDeleteUser",
+          "cognito-idp:AdminInitiateAuth",
+          "cognito-idp:ConfirmSignUp",
+          "cognito-idp:ForgotPassword",
+          "cognito-idp:ConfirmForgotPassword",
+          "cognito-idp:ListUsers"
+        ]
+        Resource = var.cognito_user_pool_arn
+      }
+    ]
+  })
+
+  tags = var.tags
+}
+
+# Attach Cognito policy to Lambda role
+resource "aws_iam_role_policy_attachment" "lambda_cognito" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = aws_iam_policy.cognito_policy.arn
+}
+
 # API Gateway CloudWatch role
 resource "aws_iam_role" "api_gateway_cloudwatch_role" {
   name = "${var.name_prefix}-apigateway-cloudwatch-role"

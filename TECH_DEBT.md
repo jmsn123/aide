@@ -1,0 +1,653 @@
+# Technical Debt Documentation
+
+This document tracks technical debt, deferred features, and future improvements for the PDF Extractor API authentication system.
+
+## Table of Contents
+- [Authentication & Authorization](#authentication--authorization)
+- [Infrastructure & DevOps](#infrastructure--devops)
+- [Code Quality & Architecture](#code-quality--architecture)
+- [Security Enhancements](#security-enhancements)
+
+---
+
+## Authentication & Authorization
+
+### 1. Email Verification Flow
+**Status**: Deferred to Iteration 5
+**Priority**: High
+**Effort**: Medium
+
+**Description**:
+Currently, users can sign up but email verification is not enforced. The `email_verified` flag exists but no verification flow is implemented.
+
+**Implementation Plan**:
+```python
+# Required components:
+1. Lambda trigger: Cognito PreSignUp - Send verification email
+2. Verification endpoint: POST /auth/verify-email
+3. Resend verification: POST /auth/resend-verification
+4. Update Cognito user pool: email_verified = true after verification
+```
+
+**Acceptance Criteria**:
+- [ ] Users receive verification email after signup
+- [ ] Email contains secure verification link with token
+- [ ] Token expires after 24 hours
+- [ ] Users can resend verification email
+- [ ] Unverified users have limited access or cannot login
+
+**Resources**:
+- AWS Cognito Custom Message Lambda Trigger
+- SES for email delivery
+- DynamoDB for verification token storage
+
+---
+
+### 2. Password Reset Flow
+**Status**: Not implemented
+**Priority**: High
+**Effort**: Medium
+
+**Description**:
+Users cannot reset forgotten passwords. Need forgot password and password reset flow.
+
+**Implementation Plan**:
+```python
+# Required endpoints:
+1. POST /auth/forgot-password - Initiate reset
+2. POST /auth/reset-password - Complete reset with code
+```
+
+**Acceptance Criteria**:
+- [ ] Users receive password reset code via email
+- [ ] Code expires after 1 hour
+- [ ] Code is single-use
+- [ ] New password meets complexity requirements
+- [ ] User can login with new password
+
+**IAM Permissions Already Added**:
+✅ `cognito-idp:ForgotPassword`
+✅ `cognito-idp:ConfirmForgotPassword`
+
+---
+
+### 3. Login Endpoint
+**Status**: Not implemented (Iteration 4)
+**Priority**: Critical
+**Effort**: Medium
+
+**Description**:
+Users can sign up but cannot login. Need authentication endpoint that returns JWT tokens.
+
+**Implementation Plan**:
+```python
+# POST /auth/login
+{
+  "email": "user@example.com",
+  "password": "password"
+}
+
+# Response:
+{
+  "access_token": "eyJ...",
+  "refresh_token": "eyJ...",
+  "expires_in": 3600,
+  "token_type": "Bearer"
+}
+```
+
+**Acceptance Criteria**:
+- [ ] Validate credentials against Cognito
+- [ ] Return access token (60 min) and refresh token (30 days)
+- [ ] Update last_login in DynamoDB
+- [ ] Handle incorrect credentials gracefully
+- [ ] Rate limit login attempts
+
+---
+
+### 4. JWT Validation Utility
+**Status**: Not implemented (Iteration 5)
+**Priority**: Critical
+**Effort**: Low
+
+**Description**:
+Need shared utility for validating JWT tokens from Cognito across all Lambda functions.
+
+**Implementation Plan**:
+```python
+# api/auth_utils.py
+import jwt
+from jwt.algorithms import RSAAlgorithm
+import requests
+
+def validate_jwt(token):
+    """Validate Cognito JWT token"""
+    # 1. Get Cognito public keys (cached)
+    # 2. Verify signature
+    # 3. Check expiration
+    # 4. Validate issuer
+    # 5. Return decoded token
+```
+
+**Acceptance Criteria**:
+- [ ] Validates token signature using Cognito public keys
+- [ ] Checks token expiration
+- [ ] Validates token issuer (User Pool)
+- [ ] Caches Cognito JWKS for performance
+- [ ] Returns user_id (sub) from valid tokens
+
+---
+
+### 5. API Gateway JWT Authorizer
+**Status**: Not implemented (Iteration 6)
+**Priority**: Critical
+**Effort**: Low
+
+**Description**:
+Protected endpoints currently use API key. Need JWT authorizer for user-specific access.
+
+**Implementation Plan**:
+```hcl
+# Terraform: JWT Authorizer
+resource "aws_api_gateway_authorizer" "jwt" {
+  name          = "cognito-jwt-authorizer"
+  type          = "COGNITO_USER_POOLS"
+  rest_api_id   = aws_api_gateway_rest_api.api.id
+  provider_arns = [aws_cognito_user_pool.main.arn]
+}
+
+# Apply to protected routes
+resource "aws_api_gateway_method" "upload_method" {
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.jwt.id
+}
+```
+
+**Acceptance Criteria**:
+- [ ] Upload endpoint requires JWT
+- [ ] Statements endpoint requires JWT
+- [ ] Auth endpoints (signup/login) remain public
+- [ ] Invalid JWT returns 401 Unauthorized
+- [ ] user_id from JWT available in Lambda event
+
+---
+
+## Infrastructure & DevOps
+
+### 6. Rate Limiting with AWS WAF
+**Status**: Not implemented
+**Priority**: High
+**Effort**: Medium
+
+**Description**:
+Public signup endpoint vulnerable to abuse/spam. Need rate limiting at API Gateway level.
+
+**Implementation Plan**:
+```hcl
+# WAF Rate-Based Rule
+resource "aws_wafv2_web_acl" "api" {
+  name  = "${var.name_prefix}-api-waf"
+  scope = "REGIONAL"
+
+  rule {
+    name     = "RateLimitSignup"
+    priority = 1
+
+    statement {
+      rate_based_statement {
+        limit              = 100  # requests per 5 minutes per IP
+        aggregate_key_type = "IP"
+
+        scope_down_statement {
+          byte_match_statement {
+            search_string = "/auth/signup"
+            field_to_match {
+              uri_path {}
+            }
+          }
+        }
+      }
+    }
+
+    action {
+      block {
+        custom_response {
+          response_code = 429
+          custom_response_body_key = "rate_limit_exceeded"
+        }
+      }
+    }
+  }
+}
+```
+
+**Acceptance Criteria**:
+- [ ] Signup: 100 requests per 5 min per IP
+- [ ] Login: 20 requests per 5 min per IP
+- [ ] Returns 429 status when exceeded
+- [ ] CloudWatch metrics for rate limit hits
+- [ ] Whitelist for known IPs (optional)
+
+**Cost**: ~$5/month + $0.60 per million requests
+
+---
+
+### 7. Usage Limits Configuration Table
+**Status**: Hardcoded in Lambda
+**Priority**: Medium
+**Effort**: Low
+
+**Description**:
+Plan limits (free/pro/enterprise) are hardcoded in Lambda code. Should be in DynamoDB config table for dynamic updates.
+
+**Current State**:
+```python
+'usage_limits': {
+    'requests_per_day': 100,
+    'requests_per_month': 1000
+}
+```
+
+**Desired State**:
+```python
+# DynamoDB: plan-configurations table
+{
+  'plan_id': 'free',
+  'limits': {
+    'requests_per_day': 100,
+    'requests_per_month': 1000,
+    'max_file_size_mb': 10,
+    'concurrent_uploads': 2
+  },
+  'features': ['basic_extraction'],
+  'price_per_month': 0
+}
+```
+
+**Implementation**:
+1. Create `plan-configurations` DynamoDB table
+2. Add plans: free, pro, enterprise
+3. Update Lambda to read from table
+4. Add environment variable or cache for performance
+
+---
+
+### 8. Lambda Configuration Parameters
+**Status**: Hardcoded in Terraform
+**Priority**: Low
+**Effort**: Low
+
+**Description**:
+Lambda timeout, memory, retention hardcoded. Should be variables for environment-specific tuning.
+
+**Current State**:
+```hcl
+timeout         = 30
+memory_size     = 256
+retention_in_days = 7
+```
+
+**Desired State**:
+```hcl
+# variables.tf
+variable "auth_lambda_config" {
+  description = "Auth Lambda configuration"
+  type = object({
+    timeout           = number
+    memory_size       = number
+    log_retention     = number
+  })
+  default = {
+    timeout       = 30
+    memory_size   = 256
+    log_retention = 7
+  }
+}
+
+# Production override:
+log_retention = 30  # Keep logs longer in prod
+```
+
+---
+
+## Code Quality & Architecture
+
+### 9. DynamoDB Profile Recovery on Login
+**Status**: Design documented, not implemented
+**Priority**: Medium
+**Effort**: Low
+
+**Description**:
+If DynamoDB write fails during signup, user exists in Cognito but not DynamoDB. Need lazy profile creation on first login.
+
+**Implementation Plan**:
+```python
+# In login Lambda:
+def lambda_handler(event, context):
+    # Authenticate with Cognito
+    tokens = cognito_client.admin_initiate_auth(...)
+    user_id = decode_jwt(tokens['id_token'])['sub']
+
+    # Check DynamoDB profile
+    try:
+        profile = users_table.get_item(Key={'user_id': user_id})
+    except:
+        profile = None
+
+    if not profile:
+        # Lazy create from Cognito
+        cognito_user = cognito_client.admin_get_user(
+            UserPoolId=USER_POOL_ID,
+            Username=email
+        )
+        profile = create_profile_from_cognito(cognito_user)
+        users_table.put_item(Item=profile)
+
+    return {
+        'tokens': tokens,
+        'profile': profile
+    }
+```
+
+**Acceptance Criteria**:
+- [ ] Login checks if DynamoDB profile exists
+- [ ] Missing profiles created from Cognito data
+- [ ] CloudWatch alert for orphaned users
+- [ ] Metrics: orphaned_users_recovered
+
+---
+
+### 10. Shared Response Utility Module
+**Status**: Implemented in signup, needs extraction
+**Priority**: Low
+**Effort**: Low
+
+**Description**:
+`api_response()` helper is duplicated across Lambda functions. Extract to shared module.
+
+**Implementation Plan**:
+```python
+# api/shared/response_utils.py
+def api_response(status_code, body, include_cors=True):
+    """Standardized API Gateway response with CORS"""
+    headers = {'Content-Type': 'application/json'}
+
+    if include_cors:
+        headers.update({
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': '...',
+            'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+        })
+
+    return {
+        'statusCode': status_code,
+        'headers': headers,
+        'body': json.dumps(body)
+    }
+
+# Usage in Lambda:
+from shared.response_utils import api_response
+
+def lambda_handler(event, context):
+    return api_response(200, {'message': 'Success'})
+```
+
+**Deployment**:
+Add to Lambda Layer (business logic layer)
+
+---
+
+## Security Enhancements
+
+### 11. Multi-Factor Authentication (MFA)
+**Status**: Not implemented
+**Priority**: Low (Optional feature)
+**Effort**: High
+
+**Description**:
+Add optional MFA for enhanced security (SMS or TOTP).
+
+**Implementation**:
+```python
+# Cognito User Pool already configured with MFA = "OFF"
+# To enable:
+1. Update Cognito: mfa_configuration = "OPTIONAL"
+2. Add MFA setup endpoint: POST /auth/mfa/setup
+3. Add MFA verify endpoint: POST /auth/mfa/verify
+4. Update login flow to handle MFA challenges
+```
+
+**Cost**: SMS MFA: $0.00645 per message (SNS)
+
+---
+
+### 12. Account Lockout Policy
+**Status**: Not implemented
+**Priority**: Medium
+**Effort**: Low
+
+**Description**:
+Prevent brute force attacks by locking accounts after N failed login attempts.
+
+**Implementation**:
+```python
+# DynamoDB tracking:
+{
+  'user_id': 'uuid',
+  'failed_login_attempts': 5,
+  'locked_until': '2025-09-30T22:00:00Z'
+}
+
+# In login Lambda:
+if user.failed_attempts >= 5:
+    if user.locked_until > now:
+        return api_response(403, {
+            'error': {
+                'code': 'ACCOUNT_LOCKED',
+                'message': 'Too many failed attempts. Try again later.'
+            }
+        })
+```
+
+**Policy**:
+- 5 failed attempts within 15 minutes
+- Lock account for 30 minutes
+- Email notification on lockout
+- Admin unlock capability
+
+---
+
+### 13. Audit Logging
+**Status**: Basic CloudWatch, no structured audit log
+**Priority**: Medium
+**Effort**: Medium
+
+**Description**:
+Comprehensive audit trail for security and compliance.
+
+**Events to Log**:
+- User signup
+- Login (success/failure)
+- Password reset
+- Email verification
+- Profile updates
+- Account deletion
+- Permission changes
+
+**Implementation**:
+```python
+# DynamoDB: audit-logs table
+{
+  'log_id': 'uuid',
+  'user_id': 'uuid',
+  'event_type': 'LOGIN_SUCCESS',
+  'timestamp': '2025-09-30T20:00:00Z',
+  'ip_address': '192.168.1.1',
+  'user_agent': 'Mozilla/5.0...',
+  'metadata': {
+    'location': 'US',
+    'device': 'Desktop'
+  }
+}
+```
+
+---
+
+## Monitoring & Observability
+
+### 14. CloudWatch Dashboards
+**Status**: Not created
+**Priority**: Medium
+**Effort**: Low
+
+**Description**:
+Centralized monitoring dashboard for authentication metrics.
+
+**Metrics**:
+- Signups per day/week
+- Login success/failure rate
+- Password reset requests
+- Active users (DAU/MAU)
+- API latency (p50, p95, p99)
+- Error rates by endpoint
+- DynamoDB throttling
+
+**Implementation**:
+Terraform CloudWatch Dashboard resource
+
+---
+
+### 15. CloudWatch Alarms
+**Status**: Not configured
+**Priority**: High
+**Effort**: Low
+
+**Description**:
+Alerts for critical issues.
+
+**Alarms**:
+- Lambda errors > 1% in 5 minutes
+- API Gateway 5xx > 1% in 5 minutes
+- Login failures > 50 in 5 minutes (potential attack)
+- DynamoDB throttling
+- Cognito API errors
+
+**Actions**:
+- SNS topic → Email/Slack
+- Auto-remediation (optional)
+
+---
+
+## Future Iterations Roadmap
+
+### Immediate (Iterations 4-6)
+1. ✅ Iteration 3: Signup endpoint (COMPLETED)
+2. 🔄 Iteration 4: Login endpoint (NEXT)
+3. ⏳ Iteration 5: JWT validation utility
+4. ⏳ Iteration 6: Update protected endpoints with JWT auth
+
+### Short-term (Iterations 7-10)
+5. ⏳ Iteration 7: Email verification
+6. ⏳ Iteration 8: Password reset
+7. ⏳ Iteration 9: Refresh token endpoint
+8. ⏳ Iteration 10: User profile management
+
+### Medium-term (Iterations 11-14)
+9. ⏳ Iteration 11: Rate limiting with WAF
+10. ⏳ Iteration 12: Audit logging
+11. ⏳ Iteration 13: CloudWatch dashboards and alarms
+12. ⏳ Iteration 14: Account lockout policy
+
+### Long-term (Iterations 15-18)
+13. ⏳ Iteration 15: MFA (optional)
+14. ⏳ Iteration 16: OAuth2 social login
+15. ⏳ Iteration 17: API key management
+16. ⏳ Iteration 18: Auto-confirm for dev environment
+
+---
+
+## Priority Matrix
+
+### P0 - Critical (Blocks production)
+- [ ] Login endpoint (Iteration 4)
+- [ ] JWT authorizer (Iteration 6)
+- [ ] Rate limiting (Iteration 11)
+
+### P1 - High (Needed for MVP)
+- [ ] Email verification (Iteration 7)
+- [ ] Password reset (Iteration 8)
+- [ ] CloudWatch alarms (Iteration 13)
+
+### P2 - Medium (Quality of life)
+- [ ] Audit logging (Iteration 12)
+- [ ] Usage limits config table
+- [ ] Account lockout policy
+- [ ] CloudWatch dashboards
+
+### P3 - Low (Nice to have)
+- [ ] MFA
+- [ ] OAuth2 social login
+- [ ] Lambda config parameterization
+- [ ] Shared response utility module
+
+---
+
+## Decision Log
+
+### Why Cognito as Source of Truth?
+**Decision**: Use Cognito for authentication, DynamoDB for metadata
+**Rationale**:
+- Cognito handles password hashing, MFA, JWT generation securely
+- DynamoDB can be rebuilt from Cognito if needed
+- Avoids complex rollback logic
+- Better separation of concerns
+
+**Alternative Considered**: Full transaction with rollback
+**Why Not**: Adds complexity, could fail, not needed when Cognito is authoritative
+
+---
+
+### Why No Rollback on DynamoDB Failure?
+**Decision**: Log warning, continue with signup
+**Rationale**:
+- User can authenticate with Cognito
+- Profile can be created on first login (lazy initialization)
+- Deleting Cognito user in rollback could fail, creating worse state
+- CloudWatch alerts for orphaned users
+
+**Mitigation**: Lazy profile creation in login Lambda
+
+---
+
+### Why Remove DynamoDB Duplicate Check?
+**Decision**: Only use Cognito `UsernameExistsException`
+**Rationale**:
+- Cognito enforces uniqueness atomically (no race condition)
+- DynamoDB check has race condition window
+- Redundant check adds latency
+- Cognito is source of truth
+
+**Performance**: Saves ~50ms per signup request
+
+---
+
+## Contributing
+
+When adding technical debt:
+1. Describe the issue clearly
+2. Explain why deferred (time/complexity/priority)
+3. Provide implementation plan
+4. List acceptance criteria
+5. Tag with iteration number if planned
+
+When resolving technical debt:
+1. Update status to "Completed"
+2. Link PR that resolved it
+3. Add any new debt created
+4. Update related sections
+
+---
+
+**Last Updated**: 2025-09-30
+**Maintained By**: Development Team
+**Review Frequency**: After each iteration

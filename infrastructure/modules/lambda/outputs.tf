@@ -59,6 +59,13 @@ output "functions" {
       version          = aws_lambda_function.excel_export.version
       source_code_hash = aws_lambda_function.excel_export.source_code_hash
     }
+    auth_signup = {
+      name             = aws_lambda_function.auth_signup.function_name
+      arn              = aws_lambda_function.auth_signup.arn
+      invoke_arn       = aws_lambda_function.auth_signup.invoke_arn
+      version          = aws_lambda_function.auth_signup.version
+      source_code_hash = aws_lambda_function.auth_signup.source_code_hash
+    }
   }
 }
 
@@ -119,6 +126,16 @@ output "log_groups" {
     statement_data = aws_cloudwatch_log_group.statement_data.name
     pdf_viewer = aws_cloudwatch_log_group.pdf_viewer.name
     excel_export = aws_cloudwatch_log_group.excel_export.name
+    auth_signup = aws_cloudwatch_log_group.auth_signup.name
+  }
+}
+
+output "auth_signup_lambda" {
+  description = "Auth Signup Lambda function details"
+  value = {
+    name        = aws_lambda_function.auth_signup.function_name
+    arn         = aws_lambda_function.auth_signup.arn
+    invoke_arn  = aws_lambda_function.auth_signup.invoke_arn
   }
 }
 
