@@ -151,10 +151,11 @@ resource "aws_cognito_user_pool_client" "main" {
 
   # Authentication flows
   explicit_auth_flows = [
-    "ALLOW_USER_PASSWORD_AUTH",    # Email + password authentication
-    "ALLOW_REFRESH_TOKEN_AUTH",    # Refresh token flow
-    "ALLOW_USER_SRP_AUTH",         # Secure Remote Password (more secure)
-    "ALLOW_CUSTOM_AUTH"            # For future custom authentication
+    "ALLOW_USER_PASSWORD_AUTH",       # Email + password authentication
+    "ALLOW_REFRESH_TOKEN_AUTH",       # Refresh token flow
+    "ALLOW_USER_SRP_AUTH",            # Secure Remote Password (more secure)
+    "ALLOW_CUSTOM_AUTH",              # For future custom authentication
+    "ALLOW_ADMIN_USER_PASSWORD_AUTH"  # Admin authentication for server-side login
   ]
 
   # Prevent user existence errors (security best practice)

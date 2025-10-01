@@ -64,6 +64,8 @@ resource "aws_api_gateway_deployment" "api" {
     aws_api_gateway_method.configurations_banks_method,
     aws_api_gateway_method.proxy_method,
     aws_api_gateway_method.proxy_root_method,
+    aws_api_gateway_method.auth_signup_method,
+    aws_api_gateway_method.auth_login_method,
     aws_api_gateway_method.cors_statements_method,
     aws_api_gateway_method.cors_upload_method,
     aws_api_gateway_method.cors_statements_data_method,
@@ -72,6 +74,8 @@ resource "aws_api_gateway_deployment" "api" {
     aws_api_gateway_method.cors_configurations_banks_method,
     aws_api_gateway_method.cors_method,
     aws_api_gateway_method.cors_root_method,
+    aws_api_gateway_method.cors_auth_signup_method,
+    aws_api_gateway_method.cors_auth_login_method,
     aws_api_gateway_integration.statements_integration,
     aws_api_gateway_integration.upload_integration,
     aws_api_gateway_integration.statements_data_integration,
@@ -80,6 +84,8 @@ resource "aws_api_gateway_deployment" "api" {
     aws_api_gateway_integration.configurations_banks_integration,
     aws_api_gateway_integration.proxy_integration,
     aws_api_gateway_integration.proxy_root_integration,
+    aws_api_gateway_integration.auth_signup_integration,
+    aws_api_gateway_integration.auth_login_integration,
     aws_api_gateway_integration.cors_statements_integration,
     aws_api_gateway_integration.cors_upload_integration,
     aws_api_gateway_integration.cors_statements_data_integration,
@@ -88,6 +94,8 @@ resource "aws_api_gateway_deployment" "api" {
     aws_api_gateway_integration.cors_configurations_banks_integration,
     aws_api_gateway_integration.cors_integration,
     aws_api_gateway_integration.cors_root_integration,
+    aws_api_gateway_integration.cors_auth_signup_integration,
+    aws_api_gateway_integration.cors_auth_login_integration,
   ]
 
   rest_api_id = aws_api_gateway_rest_api.api.id
@@ -231,6 +239,13 @@ resource "aws_api_gateway_resource" "auth_signup" {
   path_part   = "signup"
 }
 
+# Login resource under auth
+resource "aws_api_gateway_resource" "auth_login" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  parent_id   = aws_api_gateway_resource.auth.id
+  path_part   = "login"
+}
+
 # Statement data resource directly under statements (for query parameters)
 resource "aws_api_gateway_resource" "statements_data" {
   rest_api_id = aws_api_gateway_rest_api.api.id
@@ -313,6 +328,15 @@ resource "aws_api_gateway_method" "auth_signup_method" {
   http_method   = "POST"
   authorization = "NONE"
   api_key_required = false  # Signup doesn't require API key
+}
+
+# Method for auth login (POST method)
+resource "aws_api_gateway_method" "auth_login_method" {
+  rest_api_id   = aws_api_gateway_rest_api.api.id
+  resource_id   = aws_api_gateway_resource.auth_login.id
+  http_method   = "POST"
+  authorization = "NONE"
+  api_key_required = false  # Login doesn't require API key
 }
 
 # Method for statements data resource (GET method)
@@ -416,6 +440,20 @@ resource "aws_api_gateway_integration" "auth_signup_integration" {
   integration_http_method = "POST"
   type                   = "AWS_PROXY"
   uri                    = var.auth_signup_lambda_invoke_arn
+
+  # Timeout configuration
+  timeout_milliseconds = 29000
+}
+
+# Integration for auth login
+resource "aws_api_gateway_integration" "auth_login_integration" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  resource_id = aws_api_gateway_method.auth_login_method.resource_id
+  http_method = aws_api_gateway_method.auth_login_method.http_method
+
+  integration_http_method = "POST"
+  type                   = "AWS_PROXY"
+  uri                    = var.auth_login_lambda_invoke_arn
 
   # Timeout configuration
   timeout_milliseconds = 29000
@@ -531,6 +569,16 @@ resource "aws_lambda_permission" "auth_signup_api_gateway" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
   function_name = var.auth_signup_lambda_name
+  principal     = "apigateway.amazonaws.com"
+
+  source_arn = "${aws_api_gateway_rest_api.api.execution_arn}/*/*"
+}
+
+# Lambda permission for auth login endpoint
+resource "aws_lambda_permission" "auth_login_api_gateway" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = var.auth_login_lambda_name
   principal     = "apigateway.amazonaws.com"
 
   source_arn = "${aws_api_gateway_rest_api.api.execution_arn}/*/*"
@@ -712,6 +760,58 @@ resource "aws_api_gateway_integration_response" "cors_auth_signup_integration_re
   resource_id = aws_api_gateway_resource.auth_signup.id
   http_method = aws_api_gateway_method.cors_auth_signup_method.http_method
   status_code = aws_api_gateway_method_response.cors_auth_signup_method_response.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Requested-With'"
+    "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+# CORS configuration for auth login endpoint
+resource "aws_api_gateway_method" "cors_auth_login_method" {
+  rest_api_id   = aws_api_gateway_rest_api.api.id
+  resource_id   = aws_api_gateway_resource.auth_login.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+  api_key_required = false
+}
+
+resource "aws_api_gateway_integration" "cors_auth_login_integration" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  resource_id = aws_api_gateway_resource.auth_login.id
+  http_method = aws_api_gateway_method.cors_auth_login_method.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+resource "aws_api_gateway_method_response" "cors_auth_login_method_response" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  resource_id = aws_api_gateway_resource.auth_login.id
+  http_method = aws_api_gateway_method.cors_auth_login_method.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+
+  response_models = {
+    "application/json" = "Empty"
+  }
+}
+
+resource "aws_api_gateway_integration_response" "cors_auth_login_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  resource_id = aws_api_gateway_resource.auth_login.id
+  http_method = aws_api_gateway_method.cors_auth_login_method.http_method
+  status_code = aws_api_gateway_method_response.cors_auth_login_method_response.status_code
 
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Requested-With'"

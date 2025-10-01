@@ -204,6 +204,8 @@ module "api_gateway" {
   pdf_viewer_lambda_name           = module.lambda.functions.pdf_viewer.name
   auth_signup_lambda_invoke_arn    = module.lambda.functions.auth_signup.invoke_arn
   auth_signup_lambda_name          = module.lambda.functions.auth_signup.name
+  auth_login_lambda_invoke_arn     = module.lambda.functions.auth_login.invoke_arn
+  auth_login_lambda_name           = module.lambda.functions.auth_login.name
 
   # Lambda source code hashes for triggering API Gateway deployment when functions change
   lambda_source_code_hashes = {
@@ -213,6 +215,7 @@ module "api_gateway" {
     excel_export   = module.lambda.functions.excel_export.source_code_hash
     pdf_viewer     = module.lambda.functions.pdf_viewer.source_code_hash
     auth_signup    = module.lambda.functions.auth_signup.source_code_hash
+    auth_login     = module.lambda.functions.auth_login.source_code_hash
   }
 
   depends_on = [module.lambda, module.iam]

@@ -72,7 +72,7 @@ Users cannot reset forgotten passwords. Need forgot password and password reset 
 ---
 
 ### 3. Login Endpoint
-**Status**: Not implemented (Iteration 4)
+**Status**: ✅ COMPLETED (Iteration 4 - Sep 30, 2025)
 **Priority**: Critical
 **Effort**: Medium
 
@@ -97,11 +97,26 @@ Users can sign up but cannot login. Need authentication endpoint that returns JW
 ```
 
 **Acceptance Criteria**:
-- [ ] Validate credentials against Cognito
-- [ ] Return access token (60 min) and refresh token (30 days)
-- [ ] Update last_login in DynamoDB
-- [ ] Handle incorrect credentials gracefully
-- [ ] Rate limit login attempts
+- [x] Validate credentials against Cognito
+- [x] Return access token (60 min) and refresh token (30 days)
+- [x] Update last_login in DynamoDB (best effort)
+- [x] Handle incorrect credentials gracefully
+- [ ] Rate limit login attempts (Deferred to Iteration 11 - AWS WAF)
+
+**Implementation Details**:
+- Created `auth_login` Lambda function with admin authentication flow
+- Added `ALLOW_ADMIN_USER_PASSWORD_AUTH` to Cognito User Pool Client
+- Returns access_token, id_token, refresh_token, and user profile
+- Validates email format and credentials
+- Updates last_login timestamp (non-blocking)
+- Comprehensive error handling for various failure scenarios
+- CORS enabled for browser compatibility
+
+**Known Limitations** (Acceptable for MVP):
+- No lazy profile creation: If DynamoDB write fails during signup, user must re-signup
+- DynamoDB dependency: Login requires DynamoDB lookup (99.99% availability acceptable)
+- Rate limiting: Relies on Cognito built-in limits (5 attempts/sec per account)
+- Monitoring: Uses CloudWatch Logs only (no custom metrics to minimize cost)
 
 ---
 
@@ -541,9 +556,9 @@ Alerts for critical issues.
 ## Future Iterations Roadmap
 
 ### Immediate (Iterations 4-6)
-1. ✅ Iteration 3: Signup endpoint (COMPLETED)
-2. 🔄 Iteration 4: Login endpoint (NEXT)
-3. ⏳ Iteration 5: JWT validation utility
+1. ✅ Iteration 3: Signup endpoint (COMPLETED - Sep 30, 2025)
+2. ✅ Iteration 4: Login endpoint (COMPLETED - Sep 30, 2025)
+3. 🔄 Iteration 5: JWT validation utility (NEXT)
 4. ⏳ Iteration 6: Update protected endpoints with JWT auth
 
 ### Short-term (Iterations 7-10)
@@ -569,7 +584,7 @@ Alerts for critical issues.
 ## Priority Matrix
 
 ### P0 - Critical (Blocks production)
-- [ ] Login endpoint (Iteration 4)
+- [x] Login endpoint (Iteration 4) ✅ COMPLETED
 - [ ] JWT authorizer (Iteration 6)
 - [ ] Rate limiting (Iteration 11)
 

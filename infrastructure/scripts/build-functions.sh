@@ -127,7 +127,7 @@ build_all_functions() {
     clean_output
     
     # List of Lambda functions to build
-    local functions=("api" "upload" "statement_data" "excel_export" "processor" "cleanup" "dlq_processor" "pdf_viewer" "auth_signup")
+    local functions=("api" "upload" "statement_data" "excel_export" "processor" "cleanup" "dlq_processor" "pdf_viewer" "auth_signup" "auth_login")
     
     for function_name in "${functions[@]}"; do
         build_function "$function_name"

@@ -77,6 +77,16 @@ variable "auth_signup_lambda_name" {
   type        = string
 }
 
+variable "auth_login_lambda_invoke_arn" {
+  description = "Auth Login Lambda function invoke ARN"
+  type        = string
+}
+
+variable "auth_login_lambda_name" {
+  description = "Auth Login Lambda function name"
+  type        = string
+}
+
 # Lambda function source code hashes for triggering deployments
 variable "lambda_source_code_hashes" {
   description = "Map of Lambda function source code hashes"
