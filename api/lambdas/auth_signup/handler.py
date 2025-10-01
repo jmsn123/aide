@@ -21,6 +21,7 @@ dynamodb = boto3.resource('dynamodb')
 
 # Environment variables
 USER_POOL_ID = os.environ['COGNITO_USER_POOL_ID']
+CLIENT_ID = os.environ['COGNITO_CLIENT_ID']
 USERS_TABLE_NAME = os.environ['USERS_TABLE_NAME']
 
 # Configuration
@@ -307,6 +308,47 @@ def lambda_handler(event, context):
 
         print("Permanent password set")
 
+        # Authenticate the newly created user to get JWT tokens
+        # This provides seamless signup -> login flow (Netflix/Google pattern)
+        print(f"Authenticating newly created user: {username}")
+
+        try:
+            auth_response = cognito_client.admin_initiate_auth(
+                UserPoolId=USER_POOL_ID,
+                ClientId=CLIENT_ID,
+                AuthFlow='ADMIN_NO_SRP_AUTH',
+                AuthParameters={
+                    'USERNAME': username,  # Use UUID username
+                    'PASSWORD': password
+                }
+            )
+
+            # Extract tokens
+            auth_result = auth_response.get('AuthenticationResult')
+            if not auth_result:
+                # Unlikely, but handle gracefully
+                print("WARNING: Failed to get authentication result after signup")
+                # Continue with DynamoDB creation - user can still login manually
+                access_token = None
+                id_token = None
+                refresh_token = None
+                expires_in = None
+            else:
+                access_token = auth_result.get('AccessToken')
+                id_token = auth_result.get('IdToken')
+                refresh_token = auth_result.get('RefreshToken')
+                expires_in = auth_result.get('ExpiresIn', 3600)
+                print(f"Authentication successful - tokens generated for: {user_sub}")
+
+        except Exception as auth_error:
+            # Authentication failed - log but don't fail signup
+            # User exists and can login manually
+            print(f"WARNING: Failed to authenticate after signup: {str(auth_error)}")
+            access_token = None
+            id_token = None
+            refresh_token = None
+            expires_in = None
+
         # Create user record in DynamoDB (best effort - can be recovered)
         now = datetime.utcnow().isoformat() + 'Z'
 
@@ -339,16 +381,34 @@ def lambda_handler(event, context):
             print(f"DynamoDB error: {str(db_error)}")
             # Continue - don't fail the signup
 
-        # Return success response
-        return api_response(201, {
-            'success': True,
-            'data': {
+        # Return success response with JWT tokens (if authentication succeeded)
+        response_data = {
+            'user': {
                 'user_id': user_sub,
                 'email': email,
                 'name': name,
                 'email_verified': False
-            },
-            'message': 'User created successfully'
+            }
+        }
+
+        # Include JWT tokens if authentication succeeded
+        if access_token and id_token and refresh_token:
+            response_data.update({
+                'access_token': access_token,
+                'id_token': id_token,
+                'refresh_token': refresh_token,
+                'expires_in': expires_in,
+                'token_type': 'Bearer'
+            })
+            message = 'User created and authenticated successfully'
+        else:
+            # Fallback: User created but not authenticated (can login manually)
+            message = 'User created successfully. Please login to continue.'
+
+        return api_response(201, {
+            'success': True,
+            'data': response_data,
+            'message': message
         })
 
     except cognito_client.exceptions.UsernameExistsException:
