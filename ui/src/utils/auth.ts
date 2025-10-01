@@ -12,35 +12,6 @@
 import { buildApiUrl } from '../config/api'
 
 // ===========================
-// Security Utilities
-// ===========================
-
-/**
- * Sanitize sensitive data for logging
- * OWASP: Never log authentication credentials or tokens
- * PCI DSS 3.2.1: Mask sensitive authentication data
- */
-const sanitizeForLogging = (obj: any): any => {
-  if (!obj || typeof obj !== 'object') return obj
-
-  const sanitized = { ...obj }
-  const sensitiveKeys = ['access_token', 'id_token', 'refresh_token', 'password', 'token']
-
-  for (const key of sensitiveKeys) {
-    if (key in sanitized) {
-      sanitized[key] = '[REDACTED]'
-    }
-  }
-
-  // Recursively sanitize nested objects
-  if (sanitized.data && typeof sanitized.data === 'object') {
-    sanitized.data = sanitizeForLogging(sanitized.data)
-  }
-
-  return sanitized
-}
-
-// ===========================
 // Types & Interfaces
 // ===========================
 
@@ -326,9 +297,6 @@ export const signup = async (data: SignupRequest): Promise<AuthResponse> => {
 
     const result: AuthResponse = await response.json()
 
-    // SECURITY: Log sanitized response (OWASP best practice - never log tokens)
-    console.log('Signup response:', sanitizeForLogging(result))
-
     if (response.ok && result.success && result.data) {
       // Extract user from ID token
       const user = parseJWT(result.data.id_token)
@@ -372,9 +340,6 @@ export const login = async (data: LoginRequest): Promise<AuthResponse> => {
     })
 
     const result: AuthResponse = await response.json()
-
-    // SECURITY: Log sanitized response (OWASP best practice - never log tokens)
-    console.log('Login response:', sanitizeForLogging(result))
 
     if (response.ok && result.success && result.data) {
       // Extract user from ID token
