@@ -47,12 +47,12 @@ export function AuthHeader() {
             className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
             aria-label="BankStatementPro Dashboard"
           >
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-gradient-to-br icon-brand rounded-lg flex items-center justify-center">
               <FileText className="w-4 h-4 text-white" />
             </div>
             <div className="hidden sm:block">
               <h1 className="text-base font-bold text-foreground">
-                BankStatement<span className="text-purple-600">Pro</span>
+                BankStatement<span className="text-blue-600">Pro</span>
               </h1>
             </div>
           </button>
@@ -77,7 +77,7 @@ export function AuthHeader() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center gap-2 pl-2">
                 {/* User Avatar */}
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-sm font-semibold">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-500 to-blue-500 flex items-center justify-center text-white text-sm font-semibold">
                   {user?.name?.charAt(0).toUpperCase() || 'U'}
                 </div>
 

@@ -57,6 +57,33 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        brand: {
+          primary: {
+            DEFAULT: "hsl(var(--brand-primary))",
+            hover: "hsl(var(--brand-primary-hover))",
+          },
+          secondary: {
+            DEFAULT: "hsl(var(--brand-secondary))",
+            hover: "hsl(var(--brand-secondary-hover))",
+          },
+          accent: {
+            DEFAULT: "hsl(var(--brand-accent))",
+            hover: "hsl(var(--brand-accent-hover))",
+          },
+          gradient: {
+            from: "hsl(var(--brand-gradient-from))",
+            via: "hsl(var(--brand-gradient-via))",
+            to: "hsl(var(--brand-gradient-to))",
+          },
+          bg: {
+            subtle: "hsl(var(--brand-bg-subtle))",
+            muted: "hsl(var(--brand-bg-muted))",
+          },
+          border: "hsl(var(--brand-border))",
+          text: {
+            subtle: "hsl(var(--brand-text-subtle))",
+          },
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

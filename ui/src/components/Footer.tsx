@@ -13,11 +13,11 @@ export function Footer() {
           {/* Brand Section */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-gradient-to-br icon-brand rounded-lg flex items-center justify-center">
                 <FileText className="w-4 h-4 text-white" />
               </div>
               <h3 className="text-lg font-bold text-foreground">
-                BankStatement<span className="text-purple-600">Pro</span>
+                BankStatement<span className="text-blue-600">Pro</span>
               </h3>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed mb-4">
@@ -48,7 +48,7 @@ export function Footer() {
             <ul className="grid grid-cols-1 gap-2 text-sm text-muted-foreground">
               {SUPPORTED_BANKS.map((bank) => (
                 <li key={bank.id} className="flex items-center gap-2">
-                  <div className="w-1 h-1 rounded-full bg-purple-600" />
+                  <div className="w-1 h-1 rounded-full bg-blue-600" />
                   {bank.name}
                 </li>
               ))}
@@ -60,7 +60,7 @@ export function Footer() {
             <h4 className="text-sm font-semibold text-foreground mb-4">Get Started</h4>
             <button
               onClick={() => navigate('/dashboard')}
-              className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg font-medium transition-all text-sm mb-4"
+              className="w-full sm:w-auto btn-brand text-sm rounded-lg mb-4"
             >
               Upload Your Statement
             </button>

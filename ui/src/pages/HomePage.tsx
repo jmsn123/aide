@@ -26,7 +26,7 @@ export function HomePage() {
       icon: Building2,
       title: 'Multi-Bank Support',
       description: '6 major Indian banks supported with intelligent format detection',
-      gradient: 'from-purple-500 to-pink-500'
+      gradient: 'from-blue-500 to-cyan-500'
     },
     {
       icon: Zap,
@@ -53,7 +53,7 @@ export function HomePage() {
       icon: Upload,
       title: 'Upload',
       description: 'Drag & drop your bank statement PDF',
-      color: 'text-purple-600'
+      color: 'text-blue-600'
     },
     {
       icon: Cpu,
@@ -106,12 +106,12 @@ export function HomePage() {
       {/* Hero Section */}
       <section className="relative pt-32 pb-20 px-6 overflow-hidden">
         {/* Animated Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/10 via-blue-600/10 to-pink-600/10 -z-10" />
+        <div className="absolute inset-0 bg-brand-subtle -z-10" />
         <div className="absolute inset-0 hero-pattern -z-10 opacity-30" />
 
         <div className="max-w-7xl mx-auto text-center">
           {/* Badge */}
-          <Badge variant="secondary" className="mb-6 px-4 py-2 bg-purple-100 text-purple-700 border-purple-200">
+          <Badge variant="secondary" className="mb-6 px-4 py-2 badge-brand">
             <Sparkles className="w-4 h-4 mr-2 inline" />
             Intelligent Document Processing
           </Badge>
@@ -120,7 +120,7 @@ export function HomePage() {
           <h1 className="text-5xl md:text-7xl font-bold text-foreground mb-6 leading-tight">
             Transform Bank Statements
             <br />
-            into <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-600">
+            into <span className="text-brand">
               Structured Data
             </span>
           </h1>
@@ -135,7 +135,7 @@ export function HomePage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button
               size="lg"
-              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-lg px-8 py-6 h-auto font-semibold"
+              className="btn-brand text-lg px-8 py-6 h-auto"
               onClick={() => navigate('/signup')}
             >
               Sign Up Free
@@ -238,14 +238,14 @@ export function HomePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
             {/* Connecting Line */}
-            <div className="hidden md:block absolute top-16 left-1/6 right-1/6 h-1 bg-gradient-to-r from-purple-600 via-blue-600 to-green-600 -z-10" />
+            <div className="hidden md:block absolute top-16 left-1/6 right-1/6 h-1 bg-gradient-to-r from-blue-600 via-sky-600 to-emerald-600 -z-10" />
 
             {steps.map((step, index) => (
               <div key={index} className="relative flex flex-col items-center text-center">
                 <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${
-                  index === 0 ? 'from-purple-500 to-purple-700' :
-                  index === 1 ? 'from-blue-500 to-blue-700' :
-                  'from-green-500 to-green-700'
+                  index === 0 ? 'from-blue-500 to-blue-700' :
+                  index === 1 ? 'from-sky-500 to-sky-700' :
+                  'from-emerald-500 to-emerald-700'
                 } flex items-center justify-center mb-6 shadow-lg z-10`}>
                   <step.icon className="w-10 h-10 text-white" />
                 </div>
@@ -283,7 +283,7 @@ export function HomePage() {
       </section>
 
       {/* Final CTA Section */}
-      <section className="py-20 px-6 bg-gradient-to-br from-purple-600/10 via-blue-600/10 to-pink-600/10">
+      <section className="py-20 px-6 bg-brand-subtle">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
             Ready to automate your bank statement processing?
@@ -293,7 +293,7 @@ export function HomePage() {
           </p>
           <Button
             size="lg"
-            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-xl px-12 py-7 h-auto font-semibold"
+            className="btn-brand text-xl px-12 py-7 h-auto"
             onClick={() => navigate('/dashboard')}
           >
             Start Processing Now
