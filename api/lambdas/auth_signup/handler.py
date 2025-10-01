@@ -338,12 +338,70 @@ def lambda_handler(event, context):
                 id_token = auth_result.get('IdToken')
                 refresh_token = auth_result.get('RefreshToken')
                 expires_in = auth_result.get('ExpiresIn', 3600)
-                print(f"Authentication successful - tokens generated for: {user_sub}")
 
-        except Exception as auth_error:
-            # Authentication failed - log but don't fail signup
-            # User exists and can login manually
-            print(f"WARNING: Failed to authenticate after signup: {str(auth_error)}")
+                # SECURITY: Validate token expiry per NIST guidelines
+                # NIST SP 800-63B: Session tokens should expire within 12 hours
+                MIN_TOKEN_EXPIRY = 300    # 5 minutes (minimum for UX)
+                MAX_TOKEN_EXPIRY = 43200  # 12 hours (NIST recommendation)
+
+                if expires_in < MIN_TOKEN_EXPIRY:
+                    print(f"SECURITY_WARNING: Token expiry too short: {expires_in}s (min: {MIN_TOKEN_EXPIRY}s)")
+                    print(f"Adjusting to minimum safe value")
+                    expires_in = MIN_TOKEN_EXPIRY
+                elif expires_in > MAX_TOKEN_EXPIRY:
+                    print(f"SECURITY_WARNING: Token expiry exceeds NIST recommendation: {expires_in}s (max: {MAX_TOKEN_EXPIRY}s)")
+                    print(f"Capping at maximum safe value for security")
+                    expires_in = MAX_TOKEN_EXPIRY
+
+                print(f"Authentication successful - tokens generated for: {user_sub}")
+                print(f"Token expiry: {expires_in}s ({expires_in/3600:.1f} hours)")
+
+        except cognito_client.exceptions.NotAuthorizedException as e:
+            # SECURITY: Authentication denied for newly created user (should not happen)
+            # OWASP A07: Monitor for authentication anomalies
+            print(f"SECURITY_ALERT: NotAuthorizedException after signup for user {user_sub}")
+            print(f"Error class: {e.__class__.__name__}")
+            access_token = None
+            id_token = None
+            refresh_token = None
+            expires_in = None
+
+        except cognito_client.exceptions.InvalidPasswordException as e:
+            # SECURITY: Password validation failed (should be caught earlier)
+            print(f"SECURITY_WARNING: InvalidPasswordException after signup for user {user_sub}")
+            print(f"Error class: {e.__class__.__name__}")
+            access_token = None
+            id_token = None
+            refresh_token = None
+            expires_in = None
+
+        except cognito_client.exceptions.TooManyRequestsException as e:
+            # SECURITY: Rate limit exceeded - possible abuse/attack
+            # CIS AWS 3.1: Monitor for unauthorized API calls
+            print(f"SECURITY_ALERT: TooManyRequestsException during signup auth for user {user_sub}")
+            print(f"Possible rate limit attack detected")
+            access_token = None
+            id_token = None
+            refresh_token = None
+            expires_in = None
+
+        except cognito_client.exceptions.UserNotFoundException as e:
+            # SECURITY: User not found immediately after creation (critical error)
+            print(f"SECURITY_ALERT: UserNotFoundException after signup for user {user_sub}")
+            print(f"Data consistency issue - user created but not found")
+            access_token = None
+            id_token = None
+            refresh_token = None
+            expires_in = None
+
+        except Exception as unexpected_error:
+            # SECURITY: Unexpected error - log for security analysis
+            # NIST CSF DE.AE-3: Analyze detected events
+            print(f"SECURITY_ALERT: Unexpected auth failure after signup for user {user_sub}")
+            print(f"Error type: {unexpected_error.__class__.__name__}")
+            # Do not log full error message (may contain sensitive data)
+            import traceback
+            traceback.print_exc()
             access_token = None
             id_token = None
             refresh_token = None
