@@ -345,14 +345,13 @@ def lambda_handler(event, context):
                 MAX_TOKEN_EXPIRY = 43200  # 12 hours (NIST recommendation)
 
                 if expires_in < MIN_TOKEN_EXPIRY:
-                    print(f"SECURITY_WARNING: Token expiry too short: {expires_in}s (min: {MIN_TOKEN_EXPIRY}s)")
-                    print(f"Adjusting to minimum safe value")
-                    expires_in = MIN_TOKEN_EXPIRY
+                    print(f"SECURITY_CRITICAL: Token expiry {expires_in}s below minimum {MIN_TOKEN_EXPIRY}s")
+                    print(f"Action required: Update Cognito User Pool token settings")
                 elif expires_in > MAX_TOKEN_EXPIRY:
-                    print(f"SECURITY_WARNING: Token expiry exceeds NIST recommendation: {expires_in}s (max: {MAX_TOKEN_EXPIRY}s)")
-                    print(f"Capping at maximum safe value for security")
-                    expires_in = MAX_TOKEN_EXPIRY
+                    print(f"SECURITY_CRITICAL: Token expiry {expires_in}s exceeds NIST limit {MAX_TOKEN_EXPIRY}s")
+                    print(f"Action required: Update Cognito User Pool settings immediately")
 
+                # Return ACTUAL expiry from Cognito (do not modify)
                 print(f"Authentication successful - tokens generated for: {user_sub}")
                 print(f"Token expiry: {expires_in}s ({expires_in/3600:.1f} hours)")
 
