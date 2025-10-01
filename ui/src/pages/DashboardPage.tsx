@@ -34,9 +34,6 @@ function DashboardPage() {
     debounceMs: 150
   })
 
-  const handleReset = () => {
-    // No-op for simplified header
-  }
 
   const fetchBankStatements = async (isRefresh = false) => {
     try {

@@ -11,7 +11,7 @@
  * - Accessible keyboard navigation
  */
 
-import { FileText, LogOut, User, ChevronDown } from 'lucide-react'
+import { FileText, LogOut, ChevronDown } from 'lucide-react'
 import { Button } from './ui/button'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
