@@ -73,6 +73,13 @@ output "functions" {
       version          = aws_lambda_function.auth_login.version
       source_code_hash = aws_lambda_function.auth_login.source_code_hash
     }
+    auth_refresh = {
+      name             = aws_lambda_function.auth_refresh.function_name
+      arn              = aws_lambda_function.auth_refresh.arn
+      invoke_arn       = aws_lambda_function.auth_refresh.invoke_arn
+      version          = aws_lambda_function.auth_refresh.version
+      source_code_hash = aws_lambda_function.auth_refresh.source_code_hash
+    }
   }
 }
 
@@ -135,6 +142,7 @@ output "log_groups" {
     excel_export = aws_cloudwatch_log_group.excel_export.name
     auth_signup = aws_cloudwatch_log_group.auth_signup.name
     auth_login = aws_cloudwatch_log_group.auth_login.name
+    auth_refresh = aws_cloudwatch_log_group.auth_refresh.name
   }
 }
 
@@ -171,5 +179,14 @@ output "auth_login_lambda" {
     name        = aws_lambda_function.auth_login.function_name
     arn         = aws_lambda_function.auth_login.arn
     invoke_arn  = aws_lambda_function.auth_login.invoke_arn
+  }
+}
+
+output "auth_refresh_lambda" {
+  description = "Auth Refresh Lambda function details"
+  value = {
+    name        = aws_lambda_function.auth_refresh.function_name
+    arn         = aws_lambda_function.auth_refresh.arn
+    invoke_arn  = aws_lambda_function.auth_refresh.invoke_arn
   }
 }

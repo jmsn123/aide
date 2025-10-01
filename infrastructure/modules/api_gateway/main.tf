@@ -53,6 +53,17 @@ resource "aws_api_gateway_rest_api" "api" {
   })
 }
 
+# Cognito User Pool Authorizer for JWT authentication
+resource "aws_api_gateway_authorizer" "cognito" {
+  name          = "${var.name_prefix}-cognito-authorizer"
+  rest_api_id   = aws_api_gateway_rest_api.api.id
+  type          = "COGNITO_USER_POOLS"
+  provider_arns = [var.cognito_user_pool_arn]
+
+  # Identity source - where to find the JWT token in the request
+  identity_source = "method.request.header.Authorization"
+}
+
 # API Gateway deployment
 resource "aws_api_gateway_deployment" "api" {
   depends_on = [
@@ -66,6 +77,7 @@ resource "aws_api_gateway_deployment" "api" {
     aws_api_gateway_method.proxy_root_method,
     aws_api_gateway_method.auth_signup_method,
     aws_api_gateway_method.auth_login_method,
+    aws_api_gateway_method.auth_refresh_method,
     aws_api_gateway_method.cors_statements_method,
     aws_api_gateway_method.cors_upload_method,
     aws_api_gateway_method.cors_statements_data_method,
@@ -76,6 +88,7 @@ resource "aws_api_gateway_deployment" "api" {
     aws_api_gateway_method.cors_root_method,
     aws_api_gateway_method.cors_auth_signup_method,
     aws_api_gateway_method.cors_auth_login_method,
+    aws_api_gateway_method.cors_auth_refresh_method,
     aws_api_gateway_integration.statements_integration,
     aws_api_gateway_integration.upload_integration,
     aws_api_gateway_integration.statements_data_integration,
@@ -86,6 +99,7 @@ resource "aws_api_gateway_deployment" "api" {
     aws_api_gateway_integration.proxy_root_integration,
     aws_api_gateway_integration.auth_signup_integration,
     aws_api_gateway_integration.auth_login_integration,
+    aws_api_gateway_integration.auth_refresh_integration,
     aws_api_gateway_integration.cors_statements_integration,
     aws_api_gateway_integration.cors_upload_integration,
     aws_api_gateway_integration.cors_statements_data_integration,
@@ -96,6 +110,7 @@ resource "aws_api_gateway_deployment" "api" {
     aws_api_gateway_integration.cors_root_integration,
     aws_api_gateway_integration.cors_auth_signup_integration,
     aws_api_gateway_integration.cors_auth_login_integration,
+    aws_api_gateway_integration.cors_auth_refresh_integration,
   ]
 
   rest_api_id = aws_api_gateway_rest_api.api.id
@@ -246,6 +261,13 @@ resource "aws_api_gateway_resource" "auth_login" {
   path_part   = "login"
 }
 
+# Refresh resource under auth
+resource "aws_api_gateway_resource" "auth_refresh" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  parent_id   = aws_api_gateway_resource.auth.id
+  path_part   = "refresh"
+}
+
 # Statement data resource directly under statements (for query parameters)
 resource "aws_api_gateway_resource" "statements_data" {
   rest_api_id = aws_api_gateway_rest_api.api.id
@@ -308,8 +330,8 @@ resource "aws_api_gateway_method" "statements_method" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
   resource_id   = aws_api_gateway_resource.statements.id
   http_method   = "GET"
-  authorization = "NONE"
-  api_key_required = true
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito.id
 }
 
 # Method for upload resource (POST method)
@@ -317,8 +339,8 @@ resource "aws_api_gateway_method" "upload_method" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
   resource_id   = aws_api_gateway_resource.upload.id
   http_method   = "POST"
-  authorization = "NONE"
-  api_key_required = true
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito.id
 }
 
 # Method for auth signup (POST method)
@@ -339,13 +361,22 @@ resource "aws_api_gateway_method" "auth_login_method" {
   api_key_required = false  # Login doesn't require API key
 }
 
+# Method for auth refresh (POST method)
+resource "aws_api_gateway_method" "auth_refresh_method" {
+  rest_api_id   = aws_api_gateway_rest_api.api.id
+  resource_id   = aws_api_gateway_resource.auth_refresh.id
+  http_method   = "POST"
+  authorization = "NONE"
+  api_key_required = false  # Refresh doesn't require API key
+}
+
 # Method for statements data resource (GET method)
 resource "aws_api_gateway_method" "statements_data_method" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
   resource_id   = aws_api_gateway_resource.statements_data.id
   http_method   = "GET"
-  authorization = "NONE"
-  api_key_required = true
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito.id
 }
 
 # Method for Excel export resource (GET method)
@@ -353,8 +384,8 @@ resource "aws_api_gateway_method" "statements_excel_method" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
   resource_id   = aws_api_gateway_resource.statements_excel_job_id.id
   http_method   = "GET"
-  authorization = "NONE"
-  api_key_required = true
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito.id
 }
 
 # Method for PDF resource (GET method)
@@ -362,8 +393,8 @@ resource "aws_api_gateway_method" "pdf_method" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
   resource_id   = aws_api_gateway_resource.pdf_job_id.id
   http_method   = "GET"
-  authorization = "NONE"
-  api_key_required = true
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito.id
 
   request_parameters = {
     "method.request.path.job_id" = true
@@ -375,8 +406,8 @@ resource "aws_api_gateway_method" "configurations_banks_method" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
   resource_id   = aws_api_gateway_resource.configurations_banks.id
   http_method   = "GET"
-  authorization = "NONE"
-  api_key_required = true
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito.id
 }
 
 
@@ -385,8 +416,8 @@ resource "aws_api_gateway_method" "proxy_method" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
   resource_id   = aws_api_gateway_resource.proxy.id
   http_method   = "ANY"
-  authorization = "NONE"
-  api_key_required = true
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito.id
 
   # Enable CORS preflight
   request_parameters = {
@@ -399,8 +430,8 @@ resource "aws_api_gateway_method" "proxy_root_method" {
   rest_api_id   = aws_api_gateway_rest_api.api.id
   resource_id   = aws_api_gateway_rest_api.api.root_resource_id
   http_method   = "ANY"
-  authorization = "NONE"
-  api_key_required = true
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito.id
 }
 
 # Integration for statements resource
@@ -454,6 +485,20 @@ resource "aws_api_gateway_integration" "auth_login_integration" {
   integration_http_method = "POST"
   type                   = "AWS_PROXY"
   uri                    = var.auth_login_lambda_invoke_arn
+
+  # Timeout configuration
+  timeout_milliseconds = 29000
+}
+
+# Integration for auth refresh
+resource "aws_api_gateway_integration" "auth_refresh_integration" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  resource_id = aws_api_gateway_method.auth_refresh_method.resource_id
+  http_method = aws_api_gateway_method.auth_refresh_method.http_method
+
+  integration_http_method = "POST"
+  type                   = "AWS_PROXY"
+  uri                    = var.auth_refresh_lambda_invoke_arn
 
   # Timeout configuration
   timeout_milliseconds = 29000
@@ -579,6 +624,16 @@ resource "aws_lambda_permission" "auth_login_api_gateway" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
   function_name = var.auth_login_lambda_name
+  principal     = "apigateway.amazonaws.com"
+
+  source_arn = "${aws_api_gateway_rest_api.api.execution_arn}/*/*"
+}
+
+# Lambda permission for auth refresh endpoint
+resource "aws_lambda_permission" "auth_refresh_api_gateway" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = var.auth_refresh_lambda_name
   principal     = "apigateway.amazonaws.com"
 
   source_arn = "${aws_api_gateway_rest_api.api.execution_arn}/*/*"
@@ -812,6 +867,58 @@ resource "aws_api_gateway_integration_response" "cors_auth_login_integration_res
   resource_id = aws_api_gateway_resource.auth_login.id
   http_method = aws_api_gateway_method.cors_auth_login_method.http_method
   status_code = aws_api_gateway_method_response.cors_auth_login_method_response.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Requested-With'"
+    "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+# CORS configuration for auth refresh endpoint
+resource "aws_api_gateway_method" "cors_auth_refresh_method" {
+  rest_api_id   = aws_api_gateway_rest_api.api.id
+  resource_id   = aws_api_gateway_resource.auth_refresh.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+  api_key_required = false
+}
+
+resource "aws_api_gateway_integration" "cors_auth_refresh_integration" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  resource_id = aws_api_gateway_resource.auth_refresh.id
+  http_method = aws_api_gateway_method.cors_auth_refresh_method.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = jsonencode({
+      statusCode = 200
+    })
+  }
+}
+
+resource "aws_api_gateway_method_response" "cors_auth_refresh_method_response" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  resource_id = aws_api_gateway_resource.auth_refresh.id
+  http_method = aws_api_gateway_method.cors_auth_refresh_method.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+
+  response_models = {
+    "application/json" = "Empty"
+  }
+}
+
+resource "aws_api_gateway_integration_response" "cors_auth_refresh_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  resource_id = aws_api_gateway_resource.auth_refresh.id
+  http_method = aws_api_gateway_method.cors_auth_refresh_method.http_method
+  status_code = aws_api_gateway_method_response.cors_auth_refresh_method_response.status_code
 
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Requested-With'"

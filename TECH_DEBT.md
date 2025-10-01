@@ -663,6 +663,239 @@ When resolving technical debt:
 
 ---
 
+## Terraform Code Quality & Minimization
+
+### 16. Terraform Code Minimization and Refactoring
+**Status**: Not implemented
+**Priority**: Medium
+**Effort**: High (2-3 weeks)
+**Estimated Impact**: 60-80% code reduction
+
+**Description**:
+Current Terraform infrastructure has significant code duplication, particularly in the API Gateway and Lambda modules. This leads to:
+- High maintenance burden (1,190 lines in API Gateway alone)
+- Increased risk of configuration drift
+- Difficult to add new endpoints/functions
+- Large git diffs for simple changes
+- Harder code reviews
+
+**Current State**:
+```
+infrastructure/modules/lambda/main.tf     - ~510 lines (10 Lambda functions, each ~50 lines)
+infrastructure/modules/api_gateway/main.tf - ~1,190 lines (repetitive CORS, methods, integrations)
+Total repetitive code: ~1,700 lines
+```
+
+**Proposed Optimization**:
+
+#### 16.1. Lambda Functions - Use `for_each` with Metadata
+**Reduction**: 510 lines → ~100 lines (80% reduction)
+
+**Implementation**:
+```hcl
+# Create new file: infrastructure/modules/lambda/lambdas.tf
+locals {
+  api_functions = {
+    api = {
+      description     = "Main API handler for general endpoints"
+      handler         = "handler.handler"
+      timeout         = 180
+      memory_size     = 512
+      concurrency     = 5
+      dlq_enabled     = true
+      layers          = "api"
+      environment_vars = { FUNCTION_TYPE = "api" }
+    }
+    upload = { ... }
+    statement_data = { ... }
+    # ... all 10 functions
+  }
+
+  all_functions = merge(
+    local.api_functions,
+    local.processor_functions,
+    local.auth_functions
+  )
+}
+
+# Refactor main.tf to use for_each:
+resource "aws_lambda_function" "functions" {
+  for_each = local.all_functions
+
+  filename         = "${var.functions_dir}/${each.key}.zip"
+  function_name    = "${var.name_prefix}-${each.key}"
+  handler          = each.value.handler
+  timeout          = each.value.timeout
+  memory_size      = each.value.memory_size
+  # ... dynamic configuration from metadata
+}
+```
+
+**File Structure**:
+```
+infrastructure/modules/lambda/
+├── main.tf              # Core Lambda resources (for_each logic)
+├── lambdas.tf           # Lambda metadata configuration
+├── event_sources.tf     # SQS triggers, EventBridge rules
+├── variables.tf
+├── outputs.tf
+└── versions.tf
+```
+
+**Benefits**:
+- ✅ Add new Lambda by adding 10 lines to `lambdas.tf`
+- ✅ Change timeout/memory without touching main.tf
+- ✅ Clear git diffs (config vs infrastructure)
+- ✅ Type-safe with Terraform validation
+- ✅ Team-friendly (junior devs edit lambdas.tf)
+
+#### 16.2. API Gateway - Migrate to OpenAPI Specification
+**Reduction**: 1,190 lines → ~450 lines (62% reduction)
+
+**Recommendation**: Use OpenAPI spec instead of individual Terraform resources
+
+**Implementation**:
+```hcl
+# modules/api_gateway/main.tf (simplified)
+resource "aws_api_gateway_rest_api" "api" {
+  name = "${var.name_prefix}-api"
+
+  body = templatefile("${path.module}/openapi.yaml", {
+    region                = data.aws_region.current.name
+    cognito_user_pool_arn = var.cognito_user_pool_arn
+    api_lambda_arn        = var.lambda_invoke_arn
+    upload_lambda_arn     = var.upload_lambda_invoke_arn
+    # ... other ARNs
+  })
+}
+
+# Lambda permissions with for_each
+locals {
+  lambda_permissions = {
+    api    = { name = var.lambda_function_name, path = "*/*" }
+    upload = { name = var.upload_lambda_function_name, path = "*/POST/upload" }
+    # ... more
+  }
+}
+
+resource "aws_lambda_permission" "api_gateway" {
+  for_each = local.lambda_permissions
+
+  statement_id  = "AllowExecutionFromAPIGateway-${each.key}"
+  function_name = each.value.name
+  source_arn    = "${aws_api_gateway_rest_api.api.execution_arn}/${each.value.path}"
+  # ...
+}
+```
+
+**File Structure**:
+```
+infrastructure/modules/api_gateway/
+├── main.tf           # Core API Gateway resources (~150 lines)
+├── openapi.yaml      # API specification (~300 lines)
+├── variables.tf
+├── outputs.tf
+```
+
+**OpenAPI Benefits**:
+- ✅ Industry standard, portable across clouds
+- ✅ Auto-generated documentation (Swagger UI)
+- ✅ Built-in request validation
+- ✅ Easy to version control and diff
+- ✅ Single source of truth for API
+- ✅ AWS recommended best practice
+- ✅ Eliminates 500+ lines of CORS boilerplate
+
+**Alternative**: If OpenAPI is too drastic, create CORS module:
+```
+modules/api_gateway_cors/main.tf  # Reusable CORS resources
+```
+Saves ~500 lines of repetition.
+
+#### 16.3. Consolidated Lambda Permissions
+**Reduction**: ~150 lines → ~30 lines
+
+**Current**: 8 individual `aws_lambda_permission` resources
+**Proposed**: Single resource with `for_each` (see 16.2 above)
+
+**Summary of Estimated Reductions**:
+| Component | Current | Optimized | Reduction |
+|-----------|---------|-----------|-----------|
+| Lambda Functions | 510 lines | 100 lines | 80% |
+| API Gateway | 1,190 lines | 450 lines | 62% |
+| Lambda Permissions | 150 lines | 30 lines | 80% |
+| **Total** | **1,850 lines** | **580 lines** | **69%** |
+
+**Implementation Plan**:
+1. [ ] Create backup branch: `git checkout -b terraform/code-minimization`
+2. [ ] Phase 1: Lambda refactoring (Week 1)
+   - [ ] Create `lambdas.tf` with metadata
+   - [ ] Refactor `main.tf` to use `for_each`
+   - [ ] Create `event_sources.tf` for triggers
+   - [ ] Run `terraform plan` (should show NO changes)
+   - [ ] Validate with `terraform validate`
+3. [ ] Phase 2: API Gateway OpenAPI migration (Week 2)
+   - [ ] Create `openapi.yaml` specification
+   - [ ] Migrate endpoints incrementally
+   - [ ] Test each endpoint after migration
+   - [ ] Consolidate Lambda permissions
+4. [ ] Phase 3: Testing and validation (Week 3)
+   - [ ] Run full test suite
+   - [ ] Deploy to dev environment
+   - [ ] Monitor for any issues
+   - [ ] Document new structure
+5. [ ] Phase 4: Documentation and handoff
+   - [ ] Update CLAUDE.md with new structure
+   - [ ] Create migration guide
+   - [ ] Team training session
+
+**Acceptance Criteria**:
+- [ ] `terraform plan` shows no changes after refactoring
+- [ ] All endpoints function identically
+- [ ] Code reduction of at least 60%
+- [ ] All tests pass
+- [ ] Documentation updated
+- [ ] Team trained on new structure
+
+**Risks and Mitigations**:
+- **Risk**: OpenAPI migration breaks existing endpoints
+  - **Mitigation**: Incremental migration, test each endpoint
+- **Risk**: for_each changes resource names/IDs
+  - **Mitigation**: Use `moved` blocks to preserve state
+- **Risk**: Team unfamiliar with OpenAPI
+  - **Mitigation**: Training session, keep Terraform option as backup
+
+**Decision Required**:
+- [ ] Approve Lambda refactoring approach
+- [ ] Choose: OpenAPI spec vs CORS module for API Gateway
+- [ ] Assign implementation team and timeline
+
+**References**:
+- [AWS API Gateway OpenAPI Extensions](https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-swagger-extensions.html)
+- [Terraform for_each Meta-Argument](https://www.terraform.io/language/meta-arguments/for_each)
+- [Managing Resource Drift with moved Blocks](https://www.terraform.io/language/modules/develop/refactoring)
+
+**Comparison: OpenAPI vs Terraform Resources**:
+| Aspect | OpenAPI Spec | Terraform Resources | Winner |
+|--------|--------------|---------------------|--------|
+| Code Size | 200-300 lines | 1000+ lines | ✅ OpenAPI |
+| Readability | High | Low (repetitive) | ✅ OpenAPI |
+| Version Control | Easy to diff | Hard to diff | ✅ OpenAPI |
+| Request Validation | Built-in | Manual | ✅ OpenAPI |
+| Documentation | Auto-generated | Manual | ✅ OpenAPI |
+| Terraform State | Simple (1 resource) | Complex (100+ resources) | ✅ OpenAPI |
+| Learning Curve | Medium | Low | ⚠️ Terraform |
+| Complex Integrations | Limited | Full control | ⚠️ Terraform |
+
+**Senior AWS Specialist Recommendation**: **Use OpenAPI Spec**
+- AWS Best Practice documented in official guides
+- Used by major enterprises (Netflix, Stripe, etc.)
+- Reduces drift between documentation and implementation
+- Better CI/CD integration (validate spec before deploy)
+- Industry standard, portable across cloud providers
+
+---
+
 **Last Updated**: 2025-09-30
 **Maintained By**: Development Team
 **Review Frequency**: After each iteration

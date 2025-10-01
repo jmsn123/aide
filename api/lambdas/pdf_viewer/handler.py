@@ -6,12 +6,17 @@ PDF Viewer Lambda handler for retrieving and unlocking PDFs from S3
 import json
 import logging
 import os
+import sys
 import boto3
 from decimal import Decimal
 import base64
 import pypdf
 import io
 from botocore.exceptions import ClientError
+
+# Add shared module to path (Lambda layer)
+sys.path.insert(0, '/opt/python')
+from shared import extract_user_from_jwt, unauthorized_response, forbidden_response
 
 # Custom JSON encoder for DynamoDB Decimal types
 class DecimalEncoder(json.JSONEncoder):
@@ -99,7 +104,13 @@ def handler(event, context):
                 })
             }
 
-        return handle_get_pdf(job_id, cors_headers)
+        # Extract user_id from JWT (required for protected endpoint)
+        user_id = extract_user_from_jwt(event)
+        if not user_id:
+            logger.error("Missing user_id in JWT claims")
+            return unauthorized_response("Authentication required")
+
+        return handle_get_pdf(job_id, user_id, cors_headers)
 
     except Exception as e:
         logger.error(f"Lambda error: {str(e)}", exc_info=True)
@@ -116,8 +127,8 @@ def handler(event, context):
             })
         }
 
-def handle_get_pdf(job_id, cors_headers):
-    """Handle PDF retrieval and unlocking"""
+def handle_get_pdf(job_id, user_id, cors_headers):
+    """Handle PDF retrieval and unlocking - with user authorization"""
     try:
         table = dynamodb.Table(JOBS_TABLE_NAME)
 
@@ -135,6 +146,12 @@ def handle_get_pdf(job_id, cors_headers):
                 }
 
             job_data = response['Item']
+
+            # Verify ownership - critical security check
+            job_owner = job_data.get('user_id')
+            if job_owner != user_id:
+                logger.warning(f"User {user_id} attempted to access job {job_id} owned by user {job_owner}")
+                return forbidden_response("You don't have permission to access this resource")
             s3_key = job_data.get('s3_key')
             password = job_data.get('password')
 

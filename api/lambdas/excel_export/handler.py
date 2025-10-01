@@ -8,10 +8,15 @@ import json
 import logging
 from datetime import datetime
 import os
+import sys
 import boto3
 from decimal import Decimal
 import base64
 from io import BytesIO
+
+# Add shared module to path (Lambda layer)
+sys.path.insert(0, '/opt/python')
+from shared import extract_user_from_jwt, unauthorized_response, forbidden_response
 
 # Import shared formatting utilities
 from formatters.excel_formatter import (
@@ -103,7 +108,13 @@ def handler(event, context):
                 }, cls=DecimalEncoder)
             }
 
-        return handle_excel_export(job_id, cors_headers)
+        # Extract user_id from JWT (required for protected endpoint)
+        user_id = extract_user_from_jwt(event)
+        if not user_id:
+            logger.error("Missing user_id in JWT claims")
+            return unauthorized_response("Authentication required")
+
+        return handle_excel_export(job_id, user_id, cors_headers)
 
     except Exception as e:
         logger.error(f"Lambda error: {str(e)}", exc_info=True)
@@ -120,8 +131,8 @@ def handler(event, context):
             })
         }
 
-def handle_excel_export(job_id, cors_headers):
-    """Handle Excel export request"""
+def handle_excel_export(job_id, user_id, cors_headers):
+    """Handle Excel export request - with user authorization"""
     try:
         # Get job details from DynamoDB (same logic as statement_data Lambda)
         table = dynamodb.Table(JOBS_TABLE_NAME)
@@ -138,6 +149,12 @@ def handle_excel_export(job_id, cors_headers):
             }
 
         job_item = response['Item']
+
+        # Verify ownership - critical security check
+        job_owner = job_item.get('user_id')
+        if job_owner != user_id:
+            logger.warning(f"User {user_id} attempted to access job {job_id} owned by user {job_owner}")
+            return forbidden_response("You don't have permission to access this resource")
 
         # Check if processing is complete
         if job_item.get('status') != 'completed':

@@ -469,3 +469,41 @@ resource "aws_cloudwatch_log_group" "auth_login" {
   tags = var.tags
 }
 
+# Auth Refresh Lambda function
+resource "aws_lambda_function" "auth_refresh" {
+  filename         = "${var.functions_dir}/auth_refresh.zip"
+  function_name    = "${var.name_prefix}-auth-refresh"
+  role            = var.lambda_role_arn
+  handler         = "handler.lambda_handler"
+  source_code_hash = filebase64sha256("${var.functions_dir}/auth_refresh.zip")
+  runtime         = "python3.11"
+  timeout         = 30
+  memory_size     = 256
+
+  # Lambda layers for dependencies (boto3, etc.)
+  layers = var.api_lambda_layers
+
+  # Environment variables
+  environment {
+    variables = merge(var.environment_variables, {
+      ENVIRONMENT = var.environment_name
+      FUNCTION_TYPE = "auth_refresh"
+    })
+  }
+
+  tags = merge(var.tags, {
+    Name = "${var.name_prefix}-auth-refresh"
+    Type = "Lambda"
+    Purpose = "Authentication"
+    Architecture = "layers"
+  })
+}
+
+# CloudWatch log group for Auth Refresh Lambda
+resource "aws_cloudwatch_log_group" "auth_refresh" {
+  name              = "/aws/lambda/${aws_lambda_function.auth_refresh.function_name}"
+  retention_in_days = 7
+
+  tags = var.tags
+}
+

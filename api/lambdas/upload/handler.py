@@ -10,10 +10,15 @@ import logging
 from datetime import datetime, timezone, timedelta
 import uuid
 import os
+import sys
 import boto3
 from botocore.exceptions import ClientError
 from boto3.dynamodb.conditions import Key
 from decimal import Decimal
+
+# Add shared module to path (Lambda layer)
+sys.path.insert(0, '/opt/python')
+from shared import extract_user_from_jwt, unauthorized_response
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -80,7 +85,13 @@ def handler(event, context):
                 })
             }
 
-        return handle_upload(event)
+        # Extract user_id from JWT (required for protected endpoint)
+        user_id = extract_user_from_jwt(event)
+        if not user_id:
+            logger.error("Missing user_id in JWT claims")
+            return unauthorized_response("Authentication required")
+
+        return handle_upload(event, user_id)
 
     except Exception as e:
         logger.error(f"Lambda error: {str(e)}", exc_info=True)
@@ -288,7 +299,7 @@ def trigger_processing(job_id, s3_key, user_id, filename):
         # Don't fail the upload if SQS fails - processing can be triggered manually later
         return False
 
-def handle_upload(event):
+def handle_upload(event, user_id):
     """Handle POST /upload endpoint"""
     try:
         # Get headers (case-insensitive)
@@ -348,8 +359,6 @@ def handle_upload(event):
                 })
             }
 
-        # Generate a default user ID for now
-        default_user_id = "default-user"
         bank_name = bank_info  # bank_info contains the bank name when validation succeeds
 
         # Validate file type
@@ -403,7 +412,7 @@ def handle_upload(event):
             content_type='application/pdf',
             metadata={
                 'original_filename': filename,
-                'uploaded_by': default_user_id,
+                'uploaded_by': user_id,
                 'upload_timestamp': upload_timestamp.isoformat(),
                 'job_id': job_id
             }
@@ -419,7 +428,7 @@ def handle_upload(event):
         ttl = int((upload_timestamp + timedelta(days=60)).timestamp())  # 60 days TTL
         job_data = {
             'job_id': job_id,
-            'user_id': default_user_id,
+            'user_id': user_id,
             'created_at': upload_timestamp.isoformat(),
             'status': 'uploaded',
             'job_type': 'file_upload',
@@ -446,7 +455,7 @@ def handle_upload(event):
         save_to_dynamodb(job_data)
 
         # Automatically trigger processing
-        processing_triggered = trigger_processing(job_id, s3_key, default_user_id, filename)
+        processing_triggered = trigger_processing(job_id, s3_key, user_id, filename)
 
         # Update status to processing if SQS message sent successfully
         if processing_triggered:

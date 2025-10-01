@@ -206,6 +206,11 @@ module "api_gateway" {
   auth_signup_lambda_name          = module.lambda.functions.auth_signup.name
   auth_login_lambda_invoke_arn     = module.lambda.functions.auth_login.invoke_arn
   auth_login_lambda_name           = module.lambda.functions.auth_login.name
+  auth_refresh_lambda_invoke_arn   = module.lambda.functions.auth_refresh.invoke_arn
+  auth_refresh_lambda_name         = module.lambda.functions.auth_refresh.name
+
+  # Cognito User Pool ARN for JWT authorizer
+  cognito_user_pool_arn = module.cognito.user_pool_arn
 
   # Lambda source code hashes for triggering API Gateway deployment when functions change
   lambda_source_code_hashes = {
@@ -216,9 +221,10 @@ module "api_gateway" {
     pdf_viewer     = module.lambda.functions.pdf_viewer.source_code_hash
     auth_signup    = module.lambda.functions.auth_signup.source_code_hash
     auth_login     = module.lambda.functions.auth_login.source_code_hash
+    auth_refresh   = module.lambda.functions.auth_refresh.source_code_hash
   }
 
-  depends_on = [module.lambda, module.iam]
+  depends_on = [module.lambda, module.iam, module.cognito]
 }
 
 # Frontend Module (UI hosting with CloudFront)

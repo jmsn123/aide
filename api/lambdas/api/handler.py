@@ -8,12 +8,17 @@ import json
 import logging
 from datetime import datetime, timezone
 import os
+import sys
 import boto3
 from boto3.dynamodb.conditions import Key
 from decimal import Decimal
 import base64
 import io
 from botocore.exceptions import ClientError
+
+# Add shared module to path (Lambda layer)
+sys.path.insert(0, '/opt/python')
+from shared import extract_user_from_jwt, unauthorized_response
 
 # Custom JSON encoder for DynamoDB Decimal types
 class DecimalEncoder(json.JSONEncoder):
@@ -88,12 +93,12 @@ def handler(event, context):
             return handle_health()
 
         elif path == '/statements' and http_method == 'GET':
-            return handle_get_statements(event)
-
-        elif path.startswith('/pdf/') and http_method == 'GET':
-            # Extract job_id from path /pdf/{job_id}
-            job_id = path.split('/')[-1]
-            return handle_get_pdf(job_id)
+            # Protected endpoint - requires JWT authentication
+            user_id = extract_user_from_jwt(event)
+            if not user_id:
+                logger.error("Missing user_id in JWT claims")
+                return unauthorized_response("Authentication required")
+            return handle_get_statements(event, user_id)
 
         elif path == '/configurations/banks' and http_method == 'GET':
             return handle_get_bank_configurations()
@@ -155,38 +160,32 @@ def handle_health():
         })
     }
 
-def handle_get_statements(event):
-    """Handle GET /statements endpoint"""
+def handle_get_statements(event, user_id):
+    """Handle GET /statements endpoint - filtered by user_id"""
     try:
         table = dynamodb.Table(JOBS_TABLE_NAME)
 
         try:
-            # Query by status using GSI - much more efficient than scan
-            # Get items by common statuses to reduce RCUs
-            items = []
-            common_statuses = ['uploaded', 'processing', 'completed', 'failed']
+            # Query by user_id using GSI - enforces data isolation
+            # This ensures users can only see their own statements
+            response = table.query(
+                IndexName='user-jobs-index',
+                KeyConditionExpression='user_id = :user_id',
+                ExpressionAttributeValues={':user_id': user_id},
+                ScanIndexForward=False  # Sort by created_at descending (newest first)
+            )
+            items = response.get('Items', [])
 
-            for status in common_statuses:
+            # Handle pagination if needed
+            while 'LastEvaluatedKey' in response:
                 response = table.query(
-                    IndexName='status-index',
-                    KeyConditionExpression='#status = :status',
-                    ExpressionAttributeNames={'#status': 'status'},
-                    ExpressionAttributeValues={':status': status},
-                    ScanIndexForward=False  # Sort by created_at descending (newest first)
+                    IndexName='user-jobs-index',
+                    KeyConditionExpression='user_id = :user_id',
+                    ExpressionAttributeValues={':user_id': user_id},
+                    ScanIndexForward=False,
+                    ExclusiveStartKey=response['LastEvaluatedKey']
                 )
                 items.extend(response.get('Items', []))
-
-                # Handle pagination for each status
-                while 'LastEvaluatedKey' in response:
-                    response = table.query(
-                        IndexName='status-index',
-                        KeyConditionExpression='#status = :status',
-                        ExpressionAttributeNames={'#status': 'status'},
-                        ExpressionAttributeValues={':status': status},
-                        ScanIndexForward=False,
-                        ExclusiveStartKey=response['LastEvaluatedKey']
-                    )
-                    items.extend(response.get('Items', []))
 
         except Exception as e:
             logger.error(f"Error querying DynamoDB: {e}")

@@ -42,6 +42,14 @@ resource "aws_dynamodb_table" "jobs" {
     projection_type = "ALL"
   }
 
+  # GSI for authorization checks - verify job ownership
+  # Used to check if a job_id exists and belongs to a different user
+  global_secondary_index {
+    name     = "job_id-index"
+    hash_key = "job_id"
+    projection_type = "KEYS_ONLY"  # Only need user_id for ownership check
+  }
+
   # Enable point-in-time recovery
   point_in_time_recovery {
     enabled = true

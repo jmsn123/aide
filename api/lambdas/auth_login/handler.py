@@ -13,6 +13,7 @@ import os
 import boto3
 from datetime import datetime
 import re
+import uuid
 
 # AWS clients
 cognito_client = boto3.client('cognito-idp')
@@ -31,25 +32,32 @@ MAX_PASSWORD_LENGTH = 128
 users_table = dynamodb.Table(USERS_TABLE_NAME)
 
 
-def api_response(status_code, body):
+def api_response(status_code, body, request_id=None):
     """
     Create standardized API Gateway response with CORS headers
 
     Args:
         status_code: HTTP status code
         body: Response body (dict)
+        request_id: Request correlation ID
 
     Returns:
         API Gateway response object
     """
+    headers = {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Requested-With',
+        'Access-Control-Allow-Methods': 'POST,OPTIONS',
+        'Access-Control-Expose-Headers': 'X-Request-ID'
+    }
+
+    if request_id:
+        headers['X-Request-ID'] = request_id
+
     return {
         'statusCode': status_code,
-        'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Requested-With',
-            'Access-Control-Allow-Methods': 'POST,OPTIONS'
-        },
+        'headers': headers,
         'body': json.dumps(body)
     }
 
@@ -229,13 +237,18 @@ def lambda_handler(event, context):
     }
     """
 
-    print(f"Login request received: {json.dumps(event, default=str)}")
+    # Extract or generate request ID for correlation
+    request_context = event.get('requestContext', {})
+    request_id = request_context.get('requestId') or str(uuid.uuid4())
+
+    print(f"[{request_id}] Login request received")
 
     try:
         # Parse request body
         body = event.get('body')
 
         if body is None:
+            print(f"[{request_id}] Missing request body")
             return api_response(400, {
                 'success': False,
                 'error': {
@@ -403,6 +416,7 @@ def lambda_handler(event, context):
         update_last_login(user_id)
 
         # Return success response with tokens
+        print(f"[{request_id}] Login successful for user: {user_id}")
         return api_response(200, {
             'success': True,
             'data': {
@@ -419,7 +433,7 @@ def lambda_handler(event, context):
                 }
             },
             'message': 'Login successful'
-        })
+        }, request_id)
 
     except cognito_client.exceptions.NotAuthorizedException as e:
         # Invalid credentials
@@ -477,7 +491,7 @@ def lambda_handler(event, context):
         })
 
     except Exception as e:
-        print(f"Error during login: {str(e)}")
+        print(f"[{request_id}] Error during login: {str(e)}")
         import traceback
         traceback.print_exc()
 
@@ -487,4 +501,4 @@ def lambda_handler(event, context):
                 'code': 'INTERNAL_ERROR',
                 'message': 'Internal server error during login'
             }
-        })
+        }, request_id)
