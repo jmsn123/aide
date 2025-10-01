@@ -12,6 +12,54 @@ This document tracks technical debt, deferred features, and future improvements 
 
 ## Authentication & Authorization
 
+### 0. Frontend Authentication UI
+**Status**: ✅ COMPLETED (Iteration 5 - Sep 30, 2025)
+**Priority**: Critical
+**Effort**: High (10 hours)
+
+**Description**:
+Enterprise-grade frontend authentication UI with login, signup, and protected route functionality. Follows industry patterns from Amazon, Netflix, and Google.
+
+**Implementation Completed**:
+- ✅ Auth utility module with JWT token management
+- ✅ React Context for global auth state
+- ✅ Signup page with password strength indicator
+- ✅ Login page with "remember me" functionality
+- ✅ Protected route wrapper with deep linking
+- ✅ Authenticated navigation header
+- ✅ Automatic token refresh every 5 minutes
+- ✅ Exponential backoff retry logic (Netflix pattern)
+- ✅ Client-side validation to reduce API calls
+
+**Files Created**:
+- `/ui/src/utils/auth.ts` (450 lines)
+- `/ui/src/contexts/AuthContext.tsx` (230 lines)
+- `/ui/src/pages/SignupPage.tsx` (380 lines)
+- `/ui/src/pages/LoginPage.tsx` (265 lines)
+- `/ui/src/components/ProtectedRoute.tsx` (65 lines)
+- `/ui/src/components/AuthHeader.tsx` (130 lines)
+
+**Files Modified**:
+- `/ui/src/main.tsx` (routing updates)
+- `/ui/src/pages/HomePage.tsx` (CTA updates)
+- `/ui/src/components/HomeHeader.tsx` (conditional auth buttons)
+- `/ui/src/pages/DashboardPage.tsx` (use AuthHeader)
+- `/ui/src/config/api.ts` (JWT token injection)
+
+**Cost Impact**: $0 (frontend-only changes)
+
+**Future Enhancements** (see sections below):
+- Frontend email verification UI
+- Frontend password reset UI
+- Remember me with secure cookie storage
+- Session timeout warnings
+- Social auth buttons (Google, GitHub)
+- User profile editing page
+- Account settings page
+- Password change functionality
+
+---
+
 ### 1. Email Verification Flow
 **Status**: Deferred to Iteration 5
 **Priority**: High
@@ -508,6 +556,322 @@ Comprehensive audit trail for security and compliance.
 
 ---
 
+## Frontend Enhancements
+
+### 17. Session Timeout Warning Modal
+**Status**: Not implemented
+**Priority**: Medium
+**Effort**: Low (2-3 hours)
+
+**Description**:
+Users are automatically logged out after token expires (60 minutes) without warning. Need modal to warn users and allow extending session.
+
+**UX Pattern**: Banking apps style - "Your session is about to expire in 2 minutes"
+
+**Implementation**:
+```typescript
+// ui/src/components/SessionTimeoutModal.tsx
+export function SessionTimeoutModal() {
+  const [showWarning, setShowWarning] = useState(false)
+  const [timeRemaining, setTimeRemaining] = useState(120) // 2 minutes
+  const { refreshUserSession } = useAuth()
+
+  // Show warning 2 minutes before expiry
+  useEffect(() => {
+    const expiryStr = localStorage.getItem('token_expiry')
+    const expiry = parseInt(expiryStr || '0', 10)
+    const timeUntilExpiry = expiry - Date.now()
+
+    if (timeUntilExpiry < 120000) { // Less than 2 minutes
+      setShowWarning(true)
+      setTimeRemaining(Math.floor(timeUntilExpiry / 1000))
+    }
+  }, [])
+
+  return showWarning ? (
+    <Dialog open={showWarning}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Session Expiring Soon</DialogTitle>
+          <DialogDescription>
+            Your session will expire in {timeRemaining} seconds.
+            Would you like to stay signed in?
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => logout()}>Sign Out</Button>
+          <Button onClick={() => { refreshUserSession(); setShowWarning(false); }}>
+            Stay Signed In
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  ) : null
+}
+```
+
+**Acceptance Criteria**:
+- [ ] Warning appears 2 minutes before token expiry
+- [ ] Countdown timer shows remaining time
+- [ ] "Stay Signed In" button refreshes token
+- [ ] "Sign Out" button logs user out
+- [ ] Auto-logout if no action taken
+- [ ] Works across multiple tabs (localStorage events)
+
+---
+
+### 18. Frontend Email Verification UI
+**Status**: Not implemented (depends on backend Iteration 8)
+**Priority**: High
+**Effort**: Medium (3-4 hours)
+
+**Description**:
+Backend email verification exists but no frontend UI to handle verification flow.
+
+**Implementation Required**:
+1. Create `/ui/src/pages/VerifyEmailPage.tsx`:
+   - Extract verification token from URL query params
+   - Call `/auth/verify-email` endpoint
+   - Show success/error messages
+   - Redirect to dashboard on success
+
+2. Create `/ui/src/pages/ResendVerificationPage.tsx`:
+   - Form to resend verification email
+   - Call `/auth/resend-verification` endpoint
+
+3. Update SignupPage:
+   - Show "Check your email" message after signup
+   - Link to resend verification page
+
+**Route Updates**:
+```typescript
+// ui/src/main.tsx
+<Route path="/verify-email" element={<VerifyEmailPage />} />
+<Route path="/resend-verification" element={<ResendVerificationPage />} />
+```
+
+**Acceptance Criteria**:
+- [ ] User receives email after signup
+- [ ] Clicking email link verifies account
+- [ ] Success message shown after verification
+- [ ] User can resend verification email
+- [ ] Expired tokens show clear error message
+
+---
+
+### 19. Frontend Password Reset UI
+**Status**: Not implemented (depends on backend Iteration 9)
+**Priority**: High
+**Effort**: Medium (3-4 hours)
+
+**Description**:
+Backend password reset exists but no frontend UI to handle reset flow.
+
+**Implementation Required**:
+1. Create `/ui/src/pages/ForgotPasswordPage.tsx`:
+   - Email input form
+   - Call `/auth/forgot-password` endpoint
+   - Show "Check your email" success message
+
+2. Create `/ui/src/pages/ResetPasswordPage.tsx`:
+   - Extract reset code from URL query params
+   - New password form with strength indicator
+   - Call `/auth/reset-password` endpoint
+   - Redirect to login on success
+
+3. Update LoginPage:
+   - Add "Forgot password?" link below password field
+   - Link to `/forgot-password` page
+
+**Route Updates**:
+```typescript
+// ui/src/main.tsx
+<Route path="/forgot-password" element={<ForgotPasswordPage />} />
+<Route path="/reset-password" element={<ResetPasswordPage />} />
+```
+
+**Acceptance Criteria**:
+- [ ] User can request password reset from login page
+- [ ] User receives email with reset link
+- [ ] Reset link contains secure code
+- [ ] New password must meet complexity requirements
+- [ ] Password strength indicator shown
+- [ ] Expired codes show clear error message
+- [ ] Success redirects to login page
+
+---
+
+### 20. User Profile Management Page
+**Status**: Not implemented
+**Priority**: Medium
+**Effort**: Medium (4-5 hours)
+
+**Description**:
+Users cannot view or edit their profile information (name, email).
+
+**Implementation**:
+```typescript
+// ui/src/pages/ProfilePage.tsx
+export function ProfilePage() {
+  const { user, updateProfile } = useAuth()
+  const [formData, setFormData] = useState({
+    name: user?.name || '',
+    email: user?.email || ''
+  })
+
+  return (
+    <div>
+      <AuthHeader />
+      <div className="max-w-2xl mx-auto p-6">
+        <h1>Profile Settings</h1>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Personal Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleUpdateProfile}>
+              <div>
+                <Label>Full Name</Label>
+                <Input name="name" value={formData.name} onChange={handleChange} />
+              </div>
+              <div>
+                <Label>Email Address</Label>
+                <Input name="email" value={formData.email} disabled />
+                <p className="text-xs text-gray-500">
+                  Contact support to change your email
+                </p>
+              </div>
+              <Button type="submit">Save Changes</Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Change Password</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleChangePassword}>
+              <Input type="password" placeholder="Current password" />
+              <Input type="password" placeholder="New password" />
+              <Input type="password" placeholder="Confirm new password" />
+              <Button type="submit">Update Password</Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6 border-red-200">
+          <CardHeader>
+            <CardTitle className="text-red-600">Danger Zone</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Button variant="destructive" onClick={handleDeleteAccount}>
+              Delete Account
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
+```
+
+**Backend Endpoints Needed**:
+- `PUT /auth/profile` - Update user profile
+- `POST /auth/change-password` - Change password
+- `DELETE /auth/account` - Delete account
+
+**Acceptance Criteria**:
+- [ ] User can view current profile information
+- [ ] User can update name (not email)
+- [ ] User can change password with current password verification
+- [ ] Password change requires logout and re-login
+- [ ] Account deletion requires confirmation modal
+- [ ] All changes reflected immediately in AuthHeader
+
+---
+
+### 21. Social Authentication (OAuth2)
+**Status**: Not implemented
+**Priority**: Low
+**Effort**: High (8-12 hours)
+
+**Description**:
+Add "Sign in with Google" and "Sign in with GitHub" buttons.
+
+**Pattern**: Google/GitHub OAuth2 flow with Cognito Federated Identity
+
+**Implementation**:
+1. Configure Cognito Identity Providers (Google, GitHub)
+2. Add OAuth2 buttons to LoginPage and SignupPage
+3. Handle OAuth2 callback URL
+4. Create DynamoDB profile on first OAuth login
+
+**Files to Modify**:
+```typescript
+// ui/src/pages/LoginPage.tsx
+<Button onClick={() => loginWithGoogle()}>
+  <GoogleIcon /> Sign in with Google
+</Button>
+<Button onClick={() => loginWithGitHub()}>
+  <GitHubIcon /> Sign in with GitHub
+</Button>
+
+// ui/src/utils/auth.ts
+export const loginWithGoogle = async () => {
+  const oauthUrl = `${COGNITO_DOMAIN}/oauth2/authorize?...`
+  window.location.href = oauthUrl
+}
+
+// ui/src/pages/OAuth2CallbackPage.tsx
+// Handle OAuth2 redirect and exchange code for tokens
+```
+
+**Acceptance Criteria**:
+- [ ] Google OAuth2 integration
+- [ ] GitHub OAuth2 integration
+- [ ] Profile creation on first OAuth login
+- [ ] Existing email conflict handled gracefully
+- [ ] User can link/unlink social accounts
+
+---
+
+### 22. Remember Me with Secure Cookies
+**Status**: Partial (localStorage only)
+**Priority**: Low
+**Effort**: Medium (3-4 hours)
+
+**Description**:
+Currently "remember me" only saves email. Should persist refresh token in secure httpOnly cookie.
+
+**Current State**: Saves email in localStorage
+**Desired State**: Saves refresh token in secure cookie for 30 days
+
+**Implementation**:
+```typescript
+// Backend: Set httpOnly cookie on login
+res.setHeader('Set-Cookie', `refresh_token=${refreshToken}; HttpOnly; Secure; SameSite=Strict; Max-Age=2592000`)
+
+// Frontend: Remove refresh_token from localStorage
+// Backend automatically reads from cookie on /auth/refresh endpoint
+```
+
+**Benefits**:
+- ✅ More secure (JavaScript can't access refresh token)
+- ✅ XSS protection
+- ✅ True "remember me" functionality
+
+**Acceptance Criteria**:
+- [ ] Refresh token stored in httpOnly cookie
+- [ ] Cookie set with Secure flag (HTTPS only)
+- [ ] Cookie set with SameSite=Strict (CSRF protection)
+- [ ] 30-day expiration
+- [ ] /auth/refresh endpoint reads from cookie
+- [ ] Logout clears cookie
+
+---
+
 ## Monitoring & Observability
 
 ### 14. CloudWatch Dashboards
@@ -558,14 +922,15 @@ Alerts for critical issues.
 ### Immediate (Iterations 4-6)
 1. ✅ Iteration 3: Signup endpoint (COMPLETED - Sep 30, 2025)
 2. ✅ Iteration 4: Login endpoint (COMPLETED - Sep 30, 2025)
-3. 🔄 Iteration 5: JWT validation utility (NEXT)
-4. ⏳ Iteration 6: Update protected endpoints with JWT auth
+3. ✅ Iteration 5: Frontend Authentication UI (COMPLETED - Sep 30, 2025)
+4. 🔄 Iteration 6: JWT validation utility + Update protected endpoints with JWT auth (NEXT)
+5. ⏳ Iteration 7: Token refresh endpoint
 
-### Short-term (Iterations 7-10)
-5. ⏳ Iteration 7: Email verification
-6. ⏳ Iteration 8: Password reset
-7. ⏳ Iteration 9: Refresh token endpoint
+### Short-term (Iterations 8-11)
+6. ⏳ Iteration 8: Email verification
+7. ⏳ Iteration 9: Password reset
 8. ⏳ Iteration 10: User profile management
+9. ⏳ Iteration 11: Frontend - Email verification UI
 
 ### Medium-term (Iterations 11-14)
 9. ⏳ Iteration 11: Rate limiting with WAF

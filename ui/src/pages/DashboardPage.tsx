@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Header } from '../components/Header'
+import { AuthHeader } from '../components/AuthHeader'
 import { Footer } from '../components/Footer'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
 import { Badge } from '../components/ui/badge'
@@ -241,12 +241,7 @@ function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <Header
-        hasResults={false}
-        isProcessing={false}
-        filename={undefined}
-        onReset={handleReset}
-      />
+      <AuthHeader />
 
       <div className="flex-1">
         <div className="w-full px-2 py-6">

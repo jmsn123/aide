@@ -1,9 +1,11 @@
 import { FileText } from 'lucide-react'
 import { Button } from './ui/button'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 
 export function HomeHeader() {
   const navigate = useNavigate()
+  const { isAuthenticated } = useAuth()
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
@@ -24,14 +26,36 @@ export function HomeHeader() {
           </div>
         </button>
 
-        {/* Navigation */}
-        <Button
-          onClick={() => navigate('/dashboard')}
-          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium"
-          size="default"
-        >
-          Get Started Free
-        </Button>
+        {/* Navigation - Show different buttons based on auth state */}
+        <div className="flex items-center gap-3">
+          {isAuthenticated ? (
+            <Button
+              onClick={() => navigate('/dashboard')}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium"
+              size="default"
+            >
+              Dashboard
+            </Button>
+          ) : (
+            <>
+              <Button
+                onClick={() => navigate('/login')}
+                variant="ghost"
+                size="default"
+                className="font-medium"
+              >
+                Log In
+              </Button>
+              <Button
+                onClick={() => navigate('/signup')}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium"
+                size="default"
+              >
+                Sign Up
+              </Button>
+            </>
+          )}
+        </div>
       </div>
     </header>
   )

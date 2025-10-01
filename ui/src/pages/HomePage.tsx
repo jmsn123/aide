@@ -136,9 +136,9 @@ export function HomePage() {
             <Button
               size="lg"
               className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-lg px-8 py-6 h-auto font-semibold"
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/signup')}
             >
-              Get Started Free
+              Sign Up Free
               <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
             <Button
@@ -153,7 +153,7 @@ export function HomePage() {
 
           {/* Trust Badge */}
           <p className="mt-8 text-sm text-muted-foreground">
-            No signup required • Free to use • Secure processing
+            Free to use • Secure processing • Enterprise-grade encryption
           </p>
         </div>
       </section>

@@ -40,7 +40,14 @@ export const getApiHeaders = (includeApiKey = false) => {
     'Content-Type': 'application/json',
   }
 
-  if (includeApiKey) {
+  // Add JWT token if available (for authenticated endpoints)
+  const accessToken = localStorage.getItem('access_token')
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`
+  }
+
+  // Legacy API key support (deprecated, use JWT instead)
+  if (includeApiKey && API_CONFIG.apiKey) {
     headers['X-API-Key'] = API_CONFIG.apiKey
   }
 
