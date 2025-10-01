@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AuthHeader } from '../components/AuthHeader'
-import { Footer } from '../components/Footer'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -120,15 +119,15 @@ function DashboardPage() {
   const getStatusBadge = (overallStatus: string) => {
     switch (overallStatus) {
       case 'uploaded':
-        return <Badge variant="secondary" className="bg-blue-500 text-white hover:bg-blue-600">Queued</Badge>
+        return <Badge variant="secondary" className="bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800 font-semibold">Queued</Badge>
       case 'processing':
-        return <Badge variant="secondary" className="bg-yellow-500 text-white hover:bg-yellow-600">Processing</Badge>
+        return <Badge variant="secondary" className="bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800 font-semibold">Processing</Badge>
       case 'completed':
-        return <Badge variant="default" className="bg-green-500 hover:bg-green-600">Completed</Badge>
+        return <Badge variant="default" className="bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 font-semibold">Completed</Badge>
       case 'failed':
-        return <Badge variant="destructive" className="bg-red-500 hover:bg-red-600">Failed</Badge>
+        return <Badge variant="destructive" className="bg-red-100 text-red-700 border border-red-200 hover:bg-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800 font-semibold">Failed</Badge>
       default:
-        return <Badge variant="outline">Unknown</Badge>
+        return <Badge variant="outline" className="font-semibold">Unknown</Badge>
     }
   }
 
@@ -180,10 +179,10 @@ function DashboardPage() {
           <div className="flex items-start gap-1">
             <Info className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
             <div className="text-sm">
-              <div className="text-green-600 font-medium">
+              <div className="text-foreground font-semibold">
                 {transactionCount} transactions
               </div>
-              <div className="text-muted-foreground text-xs">
+              <div className="text-slate-700 dark:text-slate-300 text-xs">
                 Balance: ₹{financial.closing_balance?.toLocaleString('en-IN') || 'N/A'}
               </div>
             </div>
@@ -196,8 +195,8 @@ function DashboardPage() {
         <div className="flex items-start gap-1">
           <Info className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
           <div className="text-sm">
-            <div className="text-green-600 font-medium">Completed</div>
-            <div className="text-muted-foreground text-xs">
+            <div className="text-green-600 font-semibold">Completed</div>
+            <div className="text-foreground text-xs font-medium">
               {transactionCount ? `${transactionCount} transactions` : 'Processed'}
             </div>
           </div>
@@ -241,7 +240,7 @@ function DashboardPage() {
       <AuthHeader />
 
       <div className="flex-1">
-        <div className="w-full px-2 py-6">
+        <div className="w-full px-4 sm:px-6 py-6">
           {/* Page Header */}
           <div className="mb-8 flex justify-between items-start">
             <div>
@@ -363,9 +362,9 @@ function DashboardPage() {
                 ) : (
                   pagination.currentItems.map((statement) => (
                     <TableRow key={statement.id}>
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium text-foreground">
                         <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-muted-foreground" />
+                          <FileText className="w-4 h-4 text-slate-500" />
                           <span className="truncate max-w-[200px]" title={statement.documentName}>
                             {statement.documentName}
                           </span>
@@ -376,10 +375,10 @@ function DashboardPage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="text-slate-700 dark:text-slate-300">
                         {formatDateTime(statement.dateUploaded)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="text-slate-700 dark:text-slate-300">
                         {formatFileSize(statement.fileSize, statement.fileSizeBytes)}
                       </TableCell>
                       <TableCell>
@@ -388,7 +387,7 @@ function DashboardPage() {
                       <TableCell>
                         {getDetailsInfo(statement)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="text-slate-700 dark:text-slate-300 font-medium">
                         {statement.bankName || '-'}
                       </TableCell>
                       <TableCell>
@@ -453,8 +452,6 @@ function DashboardPage() {
           </div>
         </div>
       </div>
-      
-      <Footer />
 
       <FileUploadModal
         isOpen={isUploadModalOpen}

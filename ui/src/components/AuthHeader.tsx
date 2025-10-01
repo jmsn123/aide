@@ -38,7 +38,7 @@ export function AuthHeader() {
 
   return (
     <header className="sticky top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div className="px-4 sm:px-6 h-16 flex items-center justify-between">
         {/* Brand & Navigation */}
         <div className="flex items-center gap-8">
           {/* Brand */}
