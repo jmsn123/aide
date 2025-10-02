@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { AuthHeader } from './AuthHeader'
 import { Button } from './ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
@@ -73,7 +73,6 @@ interface StatementData {
 
 export function ResultsPage() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
   const [statement, setStatement] = useState<BankStatement | null>(null)
   const [statementData, setStatementData] = useState<StatementData | null>(null)
   const [loading, setLoading] = useState(true)
