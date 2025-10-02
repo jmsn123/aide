@@ -224,11 +224,12 @@ export const getUserFromToken = (): User | null => {
  * Pattern: Netflix resilience engineering
  */
 const RETRY_CONFIG = {
-  maxRetries: 3,
-  initialDelay: 1000, // 1 second
-  maxDelay: 10000, // 10 seconds
-  backoffMultiplier: 2
-}
+  MAX_RETRIES: 3,
+  MAX_DELAY_MS: 10000, // 10 second
+  BASE_DELAY_MS: 1000, // 1 seconds
+BACKOFF_MULTIPLIER: 2
+
+} as const ;
 
 /**
  * Sleep utility for retry delays
@@ -239,8 +240,8 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
  * Calculate exponential backoff delay
  */
 const getRetryDelay = (attempt: number): number => {
-  const delay = RETRY_CONFIG.initialDelay * Math.pow(RETRY_CONFIG.backoffMultiplier, attempt)
-  return Math.min(delay, RETRY_CONFIG.maxDelay)
+  const delay = RETRY_CONFIG.BASE_DELAY_MS * Math.pow(RETRY_CONFIG.BACKOFF_MULTIPLIER, attempt)
+  return Math.min(delay, RETRY_CONFIG.MAX_DELAY_MS)
 }
 
 /**
@@ -256,7 +257,7 @@ const fetchWithRetry = async (
     const response = await fetch(url, options)
 
     // Retry on 5xx server errors or network issues
-    if (response.status >= 500 && retryCount < RETRY_CONFIG.maxRetries) {
+    if (response.status >= 500 && retryCount < RETRY_CONFIG.MAX_RETRIES) {
       const delay = getRetryDelay(retryCount)
       console.warn(`Request failed with ${response.status}, retrying in ${delay}ms...`)
       await sleep(delay)
@@ -266,7 +267,7 @@ const fetchWithRetry = async (
     return response
   } catch (error) {
     // Network error - retry
-    if (retryCount < RETRY_CONFIG.maxRetries) {
+    if (retryCount < RETRY_CONFIG.MAX_RETRIES) {
       const delay = getRetryDelay(retryCount)
       console.warn(`Network error, retrying in ${delay}ms...`, error)
       await sleep(delay)
