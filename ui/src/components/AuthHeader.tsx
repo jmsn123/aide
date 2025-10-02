@@ -58,12 +58,16 @@ export function AuthHeader() {
           </button>
 
           {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="flex items-center gap-1">
             <Button
-              variant={isActive('/dashboard') ? 'secondary' : 'ghost'}
+              variant={isActive('/dashboard') ? 'ghost' : 'default'}
               size="sm"
               onClick={() => navigate('/dashboard')}
-              className="font-medium"
+              className={`font-semibold ${
+                !isActive('/dashboard')
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                  : 'text-slate-700 dark:text-slate-200'
+              }`}
             >
               Dashboard
             </Button>

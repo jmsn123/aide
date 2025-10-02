@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { AuthHeader } from './AuthHeader'
 import { Button } from './ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
 import { PDFViewer } from './PDFViewer'
-import { ArrowLeft, Home, FileText, Download, Loader2 } from 'lucide-react'
+import { FileText, Download, Loader2 } from 'lucide-react'
 import { apiService, ApiError } from '../services/api'
 import type { BankStatement } from '../services/api'
 
@@ -207,47 +208,29 @@ export function ResultsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
-        {/* Header with Navigation */}
-        <div className="border-b bg-card">
-          <div className="w-full px-6 py-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate('/')}
-                  className="flex items-center gap-2"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Back
-                </Button>
-                <div>
-                  <h1 className="text-xl font-semibold">Statement Results</h1>
-                  <p className="text-sm text-muted-foreground">Loading...</p>
-                </div>
-                {/* Loading Financial Summary Placeholder */}
-                <div className="flex items-center gap-4 ml-8 text-sm animate-pulse">
-                  <div className="h-4 w-20 bg-gray-300 rounded"></div>
-                  <div className="h-4 w-20 bg-gray-300 rounded"></div>
-                  <div className="h-4 w-20 bg-gray-300 rounded"></div>
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                onClick={() => navigate('/')}
-                className="flex items-center gap-2"
-              >
-                <Home className="w-4 h-4" />
-                Home
-              </Button>
-            </div>
+      <div className="min-h-screen bg-background flex flex-col">
+        <AuthHeader />
 
+        {/* Sub-header */}
+        <div className="border-b bg-card">
+          <div className="w-full px-4 sm:px-6 py-4">
+            <div className="flex items-center gap-4">
+              <div>
+                <h1 className="text-xl font-semibold">Statement Results</h1>
+                <p className="text-sm text-muted-foreground">Loading...</p>
+              </div>
+              {/* Loading Financial Summary Placeholder */}
+              <div className="flex items-center gap-4 ml-8 text-sm animate-pulse">
+                <div className="h-4 w-20 bg-gray-300 rounded"></div>
+                <div className="h-4 w-20 bg-gray-300 rounded"></div>
+                <div className="h-4 w-20 bg-gray-300 rounded"></div>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Loading Content */}
-        <div className="w-full px-6 py-6">
+        <div className="w-full px-4 sm:px-6 py-6">
           <div className="flex items-center justify-center h-96">
             <div className="flex items-center gap-2">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
@@ -261,35 +244,27 @@ export function ResultsPage() {
 
   if (error || !statement || !statementData) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2">Error</h2>
-          <p className="text-muted-foreground mb-4">{error || 'Statement data not found'}</p>
-          <Button onClick={() => navigate('/')} variant="outline">
-            <Home className="w-4 h-4 mr-2" />
-            Go Home
-          </Button>
+      <div className="min-h-screen bg-background flex flex-col">
+        <AuthHeader />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-2">Error</h2>
+            <p className="text-muted-foreground mb-4">{error || 'Statement data not found'}</p>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header with Navigation */}
+    <div className="min-h-screen bg-background flex flex-col">
+      <AuthHeader />
+
+      {/* Sub-header with Statement Info */}
       <div className="border-b bg-card">
-        <div className="w-full px-6 py-4">
-          <div className="flex items-center justify-between mb-3">
+        <div className="w-full px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/')}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back
-              </Button>
               <div>
                 <h1 className="text-xl font-semibold">Statement Results</h1>
                 <p className="text-sm text-muted-foreground">{statement.documentName}</p>
@@ -320,22 +295,13 @@ export function ResultsPage() {
                 )}
                 {isDownloadingExcel ? 'Exporting...' : 'Export Excel'}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => navigate('/')}
-                className="flex items-center gap-2"
-              >
-                <Home className="w-4 h-4" />
-                Home
-              </Button>
             </div>
           </div>
-
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="w-full px-6 py-4">
+      <div className="w-full px-4 sm:px-6 py-4">
 
         {/* Main Content Area with PDF Viewer and Transactions */}
         <div className="flex gap-6 h-[calc(100vh-200px)]">
